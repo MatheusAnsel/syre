@@ -9,4 +9,8 @@ export default defineConfig({
       '/api': 'http://localhost:3001',
     },
   },
+  define: {
+    // Expõe VITE_API_URL para o bundle de produção
+    __API_URL__: JSON.stringify(process.env.VITE_API_URL || ''),
+  },
 });

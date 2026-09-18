@@ -3,7 +3,10 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import './index.css';
 
+import { AuthProvider } from './lib/auth';
+import RequireAuth from './components/layout/RequireAuth';
 import Layout from './components/layout/Layout';
+import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Clientes from './pages/Clientes';
 import Fornecedores from './pages/Fornecedores';
@@ -15,17 +18,24 @@ import ContasReceber from './pages/ContasReceber';
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <Routes>
-        <Route element={<Layout />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/clientes" element={<Clientes />} />
-          <Route path="/fornecedores" element={<Fornecedores />} />
-          <Route path="/produtos" element={<Produtos />} />
-          <Route path="/estoque" element={<Estoque />} />
-          <Route path="/vendas" element={<Vendas />} />
-          <Route path="/contas-receber" element={<ContasReceber />} />
-        </Route>
-      </Routes>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route element={
+            <RequireAuth>
+              <Layout />
+            </RequireAuth>
+          }>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/clientes" element={<Clientes />} />
+            <Route path="/fornecedores" element={<Fornecedores />} />
+            <Route path="/produtos" element={<Produtos />} />
+            <Route path="/estoque" element={<Estoque />} />
+            <Route path="/vendas" element={<Vendas />} />
+            <Route path="/contas-receber" element={<ContasReceber />} />
+          </Route>
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   </StrictMode>
 );

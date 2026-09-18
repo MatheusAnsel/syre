@@ -7,5 +7,9 @@ export function errorHandler(
   _next: NextFunction
 ) {
   console.error(err);
-  res.status(500).json({ error: err.message || 'Erro interno do servidor' });
+
+  const emProducao = process.env.NODE_ENV === 'production';
+  res.status(500).json({
+    error: emProducao ? 'Erro interno do servidor' : err.message || 'Erro interno do servidor',
+  });
 }

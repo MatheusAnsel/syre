@@ -1,9 +1,10 @@
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Truck, Package, ShoppingCart,
-  CreditCard, BarChart2, X, Menu
+  CreditCard, BarChart2, X, Menu, LogOut
 } from 'lucide-react';
 import { useState } from 'react';
+import { useAuth } from '../../lib/auth';
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -17,6 +18,7 @@ const NAV = [
 
 export default function Sidebar() {
   const [open, setOpen] = useState(false);
+  const { usuario, logout } = useAuth();
 
   return (
     <>
@@ -98,7 +100,21 @@ export default function Sidebar() {
         </nav>
 
         <div style={{ padding: '16px 24px', borderTop: '1px solid var(--slate)' }}>
-          <p style={{ color: 'var(--gray-600)', fontSize: 11 }}>v1.0.0</p>
+          {usuario && (
+            <p style={{ color: 'var(--gray-400)', fontSize: 12, marginBottom: 10, wordBreak: 'break-all' }}>
+              {usuario.nome}
+            </p>
+          )}
+          <button
+            onClick={logout}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8, background: 'none',
+              color: 'var(--gray-400)', fontSize: 12, padding: 0,
+            }}
+          >
+            <LogOut size={14} /> Sair
+          </button>
+          <p style={{ color: 'var(--gray-600)', fontSize: 11, marginTop: 10 }}>v1.0.0</p>
         </div>
       </aside>
 

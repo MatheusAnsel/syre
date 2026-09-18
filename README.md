@@ -60,7 +60,23 @@ O frontend roda em `http://localhost:5173` e faz proxy para a API em `http://loc
 PORT=3001
 DATABASE_URL=postgresql://usuario:senha@localhost:5432/syre
 NODE_ENV=development
+FRONTEND_URL=http://localhost:5173
+JWT_SECRET=gere-um-valor-aleatorio-forte
 ```
+
+## Autenticação
+
+A API exige login (JWT) em todas as rotas `/api/*`, exceto `/api/auth/login`.
+
+Crie o usuário inicial rodando (após aplicar as migrações):
+
+```bash
+cd backend
+ADMIN_NOME="Seu Nome" ADMIN_EMAIL="voce@exemplo.com" ADMIN_SENHA='senha-forte' npm run create-admin
+```
+
+> Se a senha tiver `#`, `$` ou espaços, use aspas simples como no exemplo acima —
+> sem aspas, o dotenv corta a variável no primeiro `#` ao ler o `.env`.
 
 ## Scripts
 

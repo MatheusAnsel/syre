@@ -1,3 +1,13 @@
+export interface Usuario {
+  id: string;
+  nome: string;
+  email: string;
+  senha_hash: string;
+  ativo: boolean;
+  criado_em: string;
+  atualizado_em: string;
+}
+
 export interface Cliente {
   id: string;
   nome: string;

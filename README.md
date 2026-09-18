@@ -1,24 +1,56 @@
-# Syre — Sistema de Controle Financeiro
+<div align="center">
 
-Sistema financeiro full-stack com React, TypeScript, Node.js e PostgreSQL.
+# Syre
 
-## Módulos
+**Sistema de controle financeiro full-stack** — clientes, fornecedores, estoque, vendas e contas a receber, com autenticação JWT e API REST própria.
 
-| Módulo | Descrição |
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)](#)
+[![React](https://img.shields.io/badge/React_18-61DAFB?style=flat-square&logo=react&logoColor=black)](#)
+[![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=node.js&logoColor=white)](#)
+[![Express](https://img.shields.io/badge/Express-000000?style=flat-square&logo=express&logoColor=white)](#)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white)](#)
+[![JWT](https://img.shields.io/badge/Auth-JWT-black?style=flat-square&logo=jsonwebtokens)](#)
+
+[Portfólio](https://matheusansel-dev.vercel.app) · [LinkedIn](https://linkedin.com/in/matheusansel)
+
+</div>
+
+---
+
+## Sobre o projeto
+
+O Syre nasceu como um estudo de caso real: construir, do zero, um ERP financeiro simplificado cobrindo todo o ciclo — cadastro de clientes e fornecedores, controle de estoque, registro de vendas e cobrança de contas a receber — com a preocupação de deixá-lo pronto para produção, não só "funcionando na máquina local".
+
+Isso significou ir além do CRUD: implementar **autenticação JWT em toda a API**, **triggers no banco** para manter estoque e datas sempre consistentes, **rate limiting** e **headers de segurança**, e validar o comportamento do sistema ponta a ponta antes de considerar o trabalho concluído.
+
+## Funcionalidades
+
+| Módulo | O que faz |
 |---|---|
-| Dashboard | KPIs, gráfico de vendas, top produtos |
-| Clientes | Cadastro, busca, ativação/inativação |
-| Fornecedores | Cadastro completo com CNPJ |
-| Produtos | Cadastro com preços, estoque e fornecedor |
-| Estoque | Ajuste manual (entrada/saída) e histórico de movimentações |
-| Vendas | Criação com itens, desconto, cliente; alteração de status |
-| Contas a Receber | Geração automática por venda, recebimento parcial/total |
+| **Dashboard** | KPIs, gráfico de vendas (Recharts), ranking de produtos |
+| **Clientes** | Cadastro, busca, ativação/inativação |
+| **Fornecedores** | Cadastro completo com CNPJ |
+| **Produtos & Estoque** | Preços, fornecedor vinculado, ajuste manual de estoque com histórico de movimentações |
+| **Vendas** | Múltiplos itens, desconto, baixa automática de estoque via trigger no banco |
+| **Contas a Receber** | Geração automática por venda, recebimento parcial ou total, marcação de vencidas |
+
+## Segurança
+
+Ponto que tratei com atenção especial, por ser um sistema com dados de clientes e movimento financeiro:
+
+- **Autenticação JWT** obrigatória em toda a API (só `/api/auth/login` é público)
+- **bcrypt** para hash de senha, com resposta idêntica para "usuário não existe" e "senha errada" (evita enumeração de e-mails)
+- **Rate limiting**: geral na API e mais restrito no login, contra força bruta
+- **Helmet** (headers HTTP de segurança) e **CORS** restrito à origem do frontend em produção
+- Mensagens de erro genéricas em produção — detalhes internos (SQL, stack trace) nunca chegam ao cliente
+- Conexão com PostgreSQL via SSL em produção (Railway)
 
 ## Stack
 
 - **Frontend:** React 18, TypeScript, Vite, React Router, Recharts
-- **Backend:** Node.js, Express, TypeScript
-- **Banco:** PostgreSQL com UUID e triggers automáticos
+- **Backend:** Node.js, Express, TypeScript, JWT, bcrypt, Helmet
+- **Banco:** PostgreSQL — 8 tabelas, UUIDs, triggers automáticos (baixa de estoque, `atualizado_em`)
+- **Deploy:** Vercel (frontend) + Railway (backend/DB)
 
 ## Pré-requisitos
 
@@ -31,7 +63,6 @@ Sistema financeiro full-stack com React, TypeScript, Node.js e PostgreSQL.
 
 ```bash
 createdb syre
-psql -d syre -f backend/migrations/001_schema_inicial.sql
 ```
 
 ### 2. Backend
@@ -39,8 +70,10 @@ psql -d syre -f backend/migrations/001_schema_inicial.sql
 ```bash
 cd backend
 cp .env.example .env
-# edite .env com as credenciais do seu banco
+# edite .env com as credenciais do seu banco e um JWT_SECRET forte
 npm install
+npm run migrate
+ADMIN_NOME="Seu Nome" ADMIN_EMAIL="voce@exemplo.com" ADMIN_SENHA='senha-forte' npm run create-admin
 npm run dev
 ```
 
@@ -87,6 +120,7 @@ ADMIN_NOME="Seu Nome" ADMIN_EMAIL="voce@exemplo.com" ADMIN_SENHA='senha-forte' n
 | `npm run build` | Compila TypeScript |
 | `npm start` | Inicia build de produção |
 | `npm run migrate` | Aplica migrações SQL |
+| `npm run create-admin` | Cria/atualiza o usuário administrador |
 
 ### Frontend
 | Comando | Descrição |
@@ -98,7 +132,11 @@ ADMIN_NOME="Seu Nome" ADMIN_EMAIL="voce@exemplo.com" ADMIN_SENHA='senha-forte' n
 ## API — Endpoints principais
 
 ```
+POST   /api/auth/login
+GET    /api/auth/me
+
 GET    /api/dashboard
+
 GET    /api/clientes
 POST   /api/clientes
 PUT    /api/clientes/:id
@@ -124,3 +162,13 @@ POST   /api/contas-receber
 PATCH  /api/contas-receber/:id/receber
 POST   /api/contas-receber/marcar-vencidas
 ```
+
+(todas exigem `Authorization: Bearer <token>`, exceto `/api/auth/login`)
+
+## Autor
+
+**Matheus Ansel** — desenvolvedor full-stack
+
+- GitHub: [@MatheusAnsel](https://github.com/MatheusAnsel)
+- LinkedIn: [linkedin.com/in/matheusansel](https://linkedin.com/in/matheusansel)
+- Portfólio: [matheusansel-dev.vercel.app](https://matheusansel-dev.vercel.app)

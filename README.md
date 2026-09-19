@@ -10,6 +10,7 @@
 [![Express](https://img.shields.io/badge/Express-000000?style=flat-square&logo=express&logoColor=white)](#)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white)](#)
 [![JWT](https://img.shields.io/badge/Auth-JWT-black?style=flat-square&logo=jsonwebtokens)](#)
+[![CI](https://github.com/MatheusAnsel/syre/actions/workflows/ci.yml/badge.svg)](https://github.com/MatheusAnsel/syre/actions/workflows/ci.yml)
 
 [Portfólio](https://matheusansel-dev.vercel.app) · [LinkedIn](https://linkedin.com/in/matheusansel)
 
@@ -31,8 +32,8 @@ Isso significou ir além do CRUD: implementar **autenticação JWT em toda a API
 | **Clientes** | Cadastro, busca, ativação/inativação |
 | **Fornecedores** | Cadastro completo com CNPJ |
 | **Produtos & Estoque** | Preços, fornecedor vinculado, ajuste manual de estoque com histórico de movimentações |
-| **Vendas** | Múltiplos itens, desconto, baixa automática de estoque via trigger no banco |
-| **Contas a Receber** | Geração automática por venda, recebimento parcial ou total, marcação de vencidas |
+| **Vendas** | Múltiplos itens, desconto, total calculado no servidor, recusa venda sem estoque, baixa automática via trigger e devolução do estoque ao cancelar |
+| **Contas a Receber** | Geração automática por venda, recebimento parcial ou total (nunca acima do saldo), marcação de vencidas |
 
 ## Segurança
 
@@ -111,6 +112,26 @@ ADMIN_NOME="Seu Nome" ADMIN_EMAIL="voce@exemplo.com" ADMIN_SENHA='senha-forte' n
 > Se a senha tiver `#`, `$` ou espaços, use aspas simples como no exemplo acima —
 > sem aspas, o dotenv corta a variável no primeiro `#` ao ler o `.env`.
 
+## Testes e integração contínua
+
+O backend tem testes unitários (middlewares e validações) e de integração com Vitest e Supertest, executados contra um PostgreSQL real. Isso permite verificar triggers, transações e restrições do banco, não apenas as rotas.
+
+Cobertura funcional principal:
+
+- autenticação, expiração e adulteração de token, rate limit do login e exigência de token em todas as rotas
+- vendas: cálculo no servidor, estoque insuficiente, atomicidade da transação e cancelamento com devolução de estoque
+- contas a receber: recebimento parcial e total, limite de saldo e marcação de vencidas
+- erros do banco convertidos em respostas 4xx com mensagens fixas, sem vazar detalhes internos
+
+Para rodar localmente, crie um banco vazio chamado `syre_test` (os testes recusam qualquer banco cujo nome não termine em `_test`, porque apagam os dados):
+
+```bash
+cd backend
+npm test
+```
+
+O workflow em `.github/workflows/ci.yml` executa verificação de tipos, testes com cobertura e build do backend, além do build do frontend, a cada push e pull request. A variável `TEST_DATABASE_URL` permite apontar para outro banco de testes.
+
 ## Scripts
 
 ### Backend
@@ -119,6 +140,9 @@ ADMIN_NOME="Seu Nome" ADMIN_EMAIL="voce@exemplo.com" ADMIN_SENHA='senha-forte' n
 | `npm run dev` | Inicia em modo desenvolvimento |
 | `npm run build` | Compila TypeScript |
 | `npm start` | Inicia build de produção |
+| `npm test` | Roda os testes (exige o banco `syre_test`) |
+| `npm run test:coverage` | Testes com relatório de cobertura |
+| `npm run typecheck` | Verifica tipos do código e dos testes |
 | `npm run migrate` | Aplica migrações SQL |
 | `npm run create-admin` | Cria/atualiza o usuário administrador |
 

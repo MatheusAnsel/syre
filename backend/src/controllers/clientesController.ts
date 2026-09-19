@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import pool from '../db/pool';
+import { textoObrigatorio } from '../utils/validacao';
 
 export async function listar(req: Request, res: Response, next: NextFunction) {
   try {
@@ -36,7 +37,8 @@ export async function buscar(req: Request, res: Response, next: NextFunction) {
 
 export async function criar(req: Request, res: Response, next: NextFunction) {
   try {
-    const { nome, cpf_cnpj, email, telefone, endereco, cidade, estado, cep } = req.body;
+    const { cpf_cnpj, email, telefone, endereco, cidade, estado, cep } = req.body;
+    const nome = textoObrigatorio(req.body.nome, 'o nome');
     const { rows } = await pool.query(
       `INSERT INTO clientes (nome, cpf_cnpj, email, telefone, endereco, cidade, estado, cep)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
@@ -50,7 +52,8 @@ export async function criar(req: Request, res: Response, next: NextFunction) {
 
 export async function atualizar(req: Request, res: Response, next: NextFunction) {
   try {
-    const { nome, cpf_cnpj, email, telefone, endereco, cidade, estado, cep, ativo } = req.body;
+    const { cpf_cnpj, email, telefone, endereco, cidade, estado, cep, ativo } = req.body;
+    const nome = textoObrigatorio(req.body.nome, 'o nome');
     const { rows } = await pool.query(
       `UPDATE clientes SET nome=$1, cpf_cnpj=$2, email=$3, telefone=$4,
        endereco=$5, cidade=$6, estado=$7, cep=$8, ativo=$9

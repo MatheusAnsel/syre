@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import pool from '../db/pool';
+import { ErroHttp, textoObrigatorio, numeroPositivo, milesimos } from '../utils/validacao';
 
 export async function listar(req: Request, res: Response, next: NextFunction) {
   try {
@@ -48,7 +49,8 @@ export async function buscar(req: Request, res: Response, next: NextFunction) {
 
 export async function criar(req: Request, res: Response, next: NextFunction) {
   try {
-    const { codigo, nome, descricao, categoria, unidade, preco_custo, preco_venda, estoque_atual, estoque_minimo, fornecedor_id } = req.body;
+    const { codigo, descricao, categoria, unidade, preco_custo, preco_venda, estoque_atual, estoque_minimo, fornecedor_id } = req.body;
+    const nome = textoObrigatorio(req.body.nome, 'o nome');
     const { rows } = await pool.query(
       `INSERT INTO produtos (codigo,nome,descricao,categoria,unidade,preco_custo,preco_venda,estoque_atual,estoque_minimo,fornecedor_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
@@ -62,7 +64,8 @@ export async function criar(req: Request, res: Response, next: NextFunction) {
 
 export async function atualizar(req: Request, res: Response, next: NextFunction) {
   try {
-    const { codigo, nome, descricao, categoria, unidade, preco_custo, preco_venda, estoque_minimo, fornecedor_id, ativo } = req.body;
+    const { codigo, descricao, categoria, unidade, preco_custo, preco_venda, estoque_minimo, fornecedor_id, ativo } = req.body;
+    const nome = textoObrigatorio(req.body.nome, 'o nome');
     const { rows } = await pool.query(
       `UPDATE produtos SET codigo=$1,nome=$2,descricao=$3,categoria=$4,unidade=$5,
        preco_custo=$6,preco_venda=$7,estoque_minimo=$8,fornecedor_id=$9,ativo=$10
@@ -78,10 +81,26 @@ export async function atualizar(req: Request, res: Response, next: NextFunction)
 
 export async function ajustarEstoque(req: Request, res: Response, next: NextFunction) {
   try {
-    const { tipo, quantidade, motivo } = req.body;
+    const { tipo, motivo } = req.body;
+    if (tipo !== 'entrada' && tipo !== 'saida') {
+      throw new ErroHttp(400, 'Tipo deve ser "entrada" ou "saida"');
+    }
+    const quantidade = numeroPositivo(req.body.quantidade, 'a quantidade');
+
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+
+      // Trava a linha do produto para que dois ajustes simultâneos não passem do estoque.
+      const { rows: atual } = await client.query(
+        'SELECT estoque_atual FROM produtos WHERE id=$1 FOR UPDATE',
+        [req.params.id]
+      );
+      if (!atual[0]) throw new ErroHttp(404, 'Produto não encontrado');
+      if (tipo === 'saida' && milesimos(quantidade) > milesimos(atual[0].estoque_atual)) {
+        throw new ErroHttp(409, 'Estoque insuficiente para essa saída');
+      }
+
       const op = tipo === 'entrada' ? '+' : '-';
       await client.query(
         `UPDATE produtos SET estoque_atual = estoque_atual ${op} $1 WHERE id=$2`,

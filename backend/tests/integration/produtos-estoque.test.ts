@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import { api, resetDb, closeDb, autenticar, criarProduto, criarFornecedor, query, UUID_INEXISTENTE } from '../helpers';
 
 let auth: string;
@@ -119,22 +119,64 @@ describe('ajuste manual de estoque', () => {
     expect(mov.tipo).toBe('saida');
   });
 
-  it('desfaz o ajuste inteiro se a movimentação for inválida (transação atômica)', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('rejeita tipo de movimentação inválido com 400 e não altera nada', async () => {
     const produto = await criarProduto({ estoque_atual: 10 });
 
-    // "ajuste" não é um tipo aceito pelo CHECK da tabela de movimentações.
     const res = await api()
       .post(`/api/produtos/${produto.id}/estoque`)
       .set('Authorization', auth)
       .send({ tipo: 'ajuste', quantidade: 3, motivo: 'inválido' });
 
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'Tipo deve ser "entrada" ou "saida"' });
     const [atual] = await query('SELECT estoque_atual FROM produtos WHERE id=$1', [produto.id]);
     expect(Number(atual.estoque_atual)).toBe(10);
-    const movs = await query('SELECT id FROM movimentacoes_estoque WHERE produto_id=$1', [produto.id]);
-    expect(movs).toHaveLength(0);
-    vi.restoreAllMocks();
+    expect(await query('SELECT id FROM movimentacoes_estoque')).toHaveLength(0);
+  });
+
+  it.each([[undefined], [0], [-5], ['abc'], [null]])('rejeita quantidade inválida (%s) com 400', async (quantidade) => {
+    const produto = await criarProduto({ estoque_atual: 10 });
+
+    const res = await api()
+      .post(`/api/produtos/${produto.id}/estoque`)
+      .set('Authorization', auth)
+      .send({ tipo: 'entrada', quantidade });
+
+    expect(res.status).toBe(400);
+    const [atual] = await query('SELECT estoque_atual FROM produtos WHERE id=$1', [produto.id]);
+    expect(Number(atual.estoque_atual)).toBe(10);
+  });
+
+  it('não permite saída maior que o estoque (409), mas permite zerar o estoque', async () => {
+    const produto = await criarProduto({ estoque_atual: 5 });
+
+    const maior = await api().post(`/api/produtos/${produto.id}/estoque`).set('Authorization', auth).send({ tipo: 'saida', quantidade: 5.001 });
+    const exata = await api().post(`/api/produtos/${produto.id}/estoque`).set('Authorization', auth).send({ tipo: 'saida', quantidade: 5 });
+
+    expect(maior.status).toBe(409);
+    expect(maior.body).toEqual({ error: 'Estoque insuficiente para essa saída' });
+    expect(exata.status).toBe(200);
+    expect(Number(exata.body.estoque_atual)).toBe(0);
+    expect(await query('SELECT id FROM movimentacoes_estoque')).toHaveLength(1);
+  });
+
+  it('responde 404 ao ajustar o estoque de produto inexistente', async () => {
+    const res = await api().post(`/api/produtos/${UUID_INEXISTENTE}/estoque`).set('Authorization', auth).send({ tipo: 'entrada', quantidade: 1 });
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: 'Produto não encontrado' });
+  });
+
+  it('exige nome ao cadastrar produto', async () => {
+    const res = await api().post('/api/produtos').set('Authorization', auth).send({ codigo: 'X-1' });
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'Informe o nome' });
+  });
+
+  it('não aceita código de produto duplicado (409)', async () => {
+    await criarProduto({ codigo: 'CAN-01' });
+    const res = await api().post('/api/produtos').set('Authorization', auth).send({ nome: 'Outro', codigo: 'CAN-01' });
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({ error: 'Código de produto já cadastrado' });
   });
 
   it('lista as movimentações da mais recente para a mais antiga', async () => {

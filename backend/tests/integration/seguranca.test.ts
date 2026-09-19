@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
-import { api, resetDb, closeDb, autenticar, criarCliente, query, UUID_INEXISTENTE } from '../helpers';
+import { describe, it, expect, beforeEach, afterAll, afterEach, vi } from 'vitest';
+import pool from '../../src/db/pool';
+import { api, resetDb, closeDb, autenticar, criarCliente, criarProduto, query, UUID_INEXISTENTE } from '../helpers';
 
 beforeEach(resetDb);
 afterAll(closeDb);
@@ -92,19 +93,41 @@ describe('proteção contra injeção de SQL', () => {
 });
 
 describe('tratamento de erros em produção', () => {
-  it('não vaza detalhes do banco de dados na resposta de erro 500', async () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('não vaza detalhes internos em erros inesperados (500)', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.stubEnv('NODE_ENV', 'production');
     const { auth } = await autenticar();
+    vi.spyOn(pool, 'query').mockRejectedValueOnce(new Error('connection to server at "10.0.0.5", port 5432 refused'));
 
-    // Sem "nome" o INSERT viola a restrição NOT NULL do banco e cai no errorHandler.
-    const res = await api().post('/api/clientes').send({}).set('Authorization', auth);
+    const res = await api().get('/api/clientes').set('Authorization', auth);
 
     expect(res.status).toBe(500);
     expect(res.body).toEqual({ error: 'Erro interno do servidor' });
-    expect(JSON.stringify(res.body)).not.toMatch(/null value|violates|constraint|clientes/i);
+    expect(JSON.stringify(res.body)).not.toMatch(/10\.0\.0\.5|5432|connection/);
+  });
 
-    vi.unstubAllEnvs();
-    vi.restoreAllMocks();
+  it('erros rejeitados pelo banco viram 4xx com mensagem fixa, sem nome de tabela, coluna ou constraint', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.stubEnv('NODE_ENV', 'production');
+    const { auth } = await autenticar();
+    await criarCliente({ cpf_cnpj: '111.111.111-11' });
+
+    const naoUuid = await api().get('/api/clientes/abc').set('Authorization', auth);
+    const duplicado = await api().post('/api/clientes').set('Authorization', auth).send({ nome: 'Outro', cpf_cnpj: '111.111.111-11' });
+    const fkInexistente = await api().post('/api/vendas').set('Authorization', auth).send({
+      cliente_id: UUID_INEXISTENTE,
+      itens: [{ produto_id: (await criarProduto()).id, quantidade: 1, preco_unit: 10 }],
+    });
+
+    expect(naoUuid.status).toBe(400);
+    expect(duplicado.status).toBe(409);
+    expect(fkInexistente.status).toBe(409);
+    const corpos = JSON.stringify([naoUuid.body, duplicado.body, fkInexistente.body]);
+    expect(corpos).not.toMatch(/uuid|invalid input|violates|constraint|clientes_cpf|_key|foreign key|vendas_/i);
   });
 });

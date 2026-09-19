@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import pool from '../db/pool';
+import { ErroHttp, textoObrigatorio, numeroPositivo, centavos } from '../utils/validacao';
 
 export async function listar(req: Request, res: Response, next: NextFunction) {
   try {
@@ -38,7 +39,9 @@ export async function buscar(req: Request, res: Response, next: NextFunction) {
 
 export async function criar(req: Request, res: Response, next: NextFunction) {
   try {
-    const { cliente_id, descricao, valor, vencimento } = req.body;
+    const { cliente_id, vencimento } = req.body;
+    const descricao = textoObrigatorio(req.body.descricao, 'a descrição');
+    const valor = numeroPositivo(req.body.valor, 'o valor');
     const { rows } = await pool.query(
       `INSERT INTO contas_receber (cliente_id, descricao, valor, vencimento)
        VALUES ($1,$2,$3,$4) RETURNING *`,
@@ -52,18 +55,40 @@ export async function criar(req: Request, res: Response, next: NextFunction) {
 
 export async function registrarRecebimento(req: Request, res: Response, next: NextFunction) {
   try {
-    const { valor_pago } = req.body;
-    const { rows: atual } = await pool.query('SELECT * FROM contas_receber WHERE id=$1', [req.params.id]);
-    if (!atual[0]) return res.status(404).json({ error: 'Conta não encontrada' });
+    const valorPago = numeroPositivo(req.body.valor_pago, 'o valor_pago');
 
-    const totalPago = parseFloat(atual[0].valor_pago) + parseFloat(valor_pago);
-    const novoStatus = totalPago >= parseFloat(atual[0].valor) ? 'recebida' : 'aberta';
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    const { rows } = await pool.query(
-      `UPDATE contas_receber SET valor_pago=$1, status=$2 WHERE id=$3 RETURNING *`,
-      [totalPago, novoStatus, req.params.id]
-    );
-    res.json(rows[0]);
+      const { rows: atual } = await client.query('SELECT * FROM contas_receber WHERE id=$1 FOR UPDATE', [req.params.id]);
+      const conta = atual[0];
+      if (!conta) throw new ErroHttp(404, 'Conta não encontrada');
+      if (conta.status === 'recebida') throw new ErroHttp(409, 'Conta já quitada');
+      if (conta.status === 'cancelada') throw new ErroHttp(409, 'Conta cancelada não aceita recebimento');
+
+      const saldoCent = centavos(conta.valor) - centavos(conta.valor_pago);
+      const pagoCent = centavos(valorPago);
+      if (pagoCent > saldoCent) {
+        throw new ErroHttp(400, `Valor maior que o saldo em aberto (${(saldoCent / 100).toFixed(2)})`);
+      }
+
+      const totalPago = (centavos(conta.valor_pago) + pagoCent) / 100;
+      // Pagamento parcial não tira a conta de "vencida"; só a quitação total muda o status.
+      const novoStatus = pagoCent === saldoCent ? 'recebida' : conta.status;
+
+      const { rows } = await client.query(
+        `UPDATE contas_receber SET valor_pago=$1, status=$2 WHERE id=$3 RETURNING *`,
+        [totalPago, novoStatus, req.params.id]
+      );
+      await client.query('COMMIT');
+      res.json(rows[0]);
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
   } catch (err) {
     next(err);
   }

@@ -93,4 +93,49 @@ describe('clientes', () => {
     const [registro] = await query('SELECT ativo FROM clientes WHERE id=$1', [cliente.id]);
     expect(registro.ativo).toBe(false);
   });
+
+  it.each([[undefined], [''], ['   '], [123], [null]])('exige um nome válido ao cadastrar (%s) e responde 400', async (nome) => {
+    const res = await api().post('/api/clientes').set('Authorization', auth).send({ nome });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'Informe o nome' });
+    expect(await query('SELECT id FROM clientes')).toHaveLength(0);
+  });
+
+  it('remove espaços extras nas pontas do nome', async () => {
+    const res = await api().post('/api/clientes').set('Authorization', auth).send({ nome: '  Maria  ' });
+    expect(res.status).toBe(201);
+    expect(res.body.nome).toBe('Maria');
+  });
+
+  it('exige nome também ao atualizar', async () => {
+    const cliente = await criarCliente();
+    const res = await api().put(`/api/clientes/${cliente.id}`).set('Authorization', auth).send({ nome: '', ativo: true });
+    expect(res.status).toBe(400);
+  });
+
+  it('responde 409 ao cadastrar CPF/CNPJ que já existe', async () => {
+    await criarCliente({ cpf_cnpj: '123.456.789-09' });
+
+    const res = await api().post('/api/clientes').set('Authorization', auth).send({ nome: 'Outro', cpf_cnpj: '123.456.789-09' });
+
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({ error: 'CPF/CNPJ já cadastrado' });
+  });
+
+  it('responde 400 (e não 500) quando o id não é um UUID', async () => {
+    const buscar = await api().get('/api/clientes/abc').set('Authorization', auth);
+    const atualizar = await api().put('/api/clientes/123').set('Authorization', auth).send({ nome: 'X', ativo: true });
+
+    expect(buscar.status).toBe(400);
+    expect(buscar.body).toEqual({ error: 'Formato inválido em um dos campos' });
+    expect(atualizar.status).toBe(400);
+  });
+
+  it('responde 400 para JSON malformado no corpo da requisição', async () => {
+    const res = await api().post('/api/clientes').set('Authorization', auth).set('Content-Type', 'application/json').send('{"nome": ');
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'JSON inválido no corpo da requisição' });
+  });
 });

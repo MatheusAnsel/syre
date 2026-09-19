@@ -74,4 +74,15 @@ describe('fornecedores', () => {
     const lista = await api().get('/api/fornecedores').set('Authorization', auth);
     expect(lista.body).toEqual([]);
   });
+
+  it('exige nome e rejeita CNPJ duplicado', async () => {
+    await criarFornecedor({ cnpj: '11.222.333/0001-44' });
+
+    const semNome = await api().post('/api/fornecedores').set('Authorization', auth).send({ cnpj: '99.999.999/0001-99' });
+    const duplicado = await api().post('/api/fornecedores').set('Authorization', auth).send({ nome: 'Outro', cnpj: '11.222.333/0001-44' });
+
+    expect(semNome.status).toBe(400);
+    expect(duplicado.status).toBe(409);
+    expect(duplicado.body).toEqual({ error: 'CNPJ já cadastrado' });
+  });
 });

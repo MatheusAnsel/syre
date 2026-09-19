@@ -35,7 +35,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || 'Erro na requisição');
+    const mensagem = err.error || 'Erro na requisição';
+    // Ações de gravação avisam o usuário (ex.: estoque insuficiente). A tela de login exibe o erro por conta própria.
+    const gravacao = options?.method && options.method !== 'GET';
+    if (gravacao && !path.startsWith('/auth/')) window.alert(mensagem);
+    throw new Error(mensagem);
   }
   if (res.status === 204) return {} as T;
   return res.json();

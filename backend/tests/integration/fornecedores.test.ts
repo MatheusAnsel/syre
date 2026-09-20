@@ -14,10 +14,10 @@ describe('fornecedores', () => {
     const res = await api()
       .post('/api/fornecedores')
       .set('Authorization', auth)
-      .send({ nome: 'Distribuidora Alfa', cnpj: '11.222.333/0001-44', cidade: 'Niterói', estado: 'RJ' });
+      .send({ nome: 'Distribuidora Alfa', cnpj: '11.222.333/0001-81', cidade: 'Niterói', estado: 'RJ' });
 
     expect(res.status).toBe(201);
-    expect(res.body).toMatchObject({ nome: 'Distribuidora Alfa', cnpj: '11.222.333/0001-44', ativo: true });
+    expect(res.body).toMatchObject({ nome: 'Distribuidora Alfa', cnpj: '11.222.333/0001-81', ativo: true });
   });
 
   it('lista apenas fornecedores ativos, ordenados por nome', async () => {
@@ -31,11 +31,11 @@ describe('fornecedores', () => {
   });
 
   it('busca por nome ou CNPJ', async () => {
-    await criarFornecedor({ nome: 'Alfa Ltda', cnpj: '11.111.111/0001-11' });
-    await criarFornecedor({ nome: 'Beta SA', cnpj: '22.222.222/0001-22' });
+    await criarFornecedor({ nome: 'Alfa Ltda', cnpj: '11.122.233/0001-83' });
+    await criarFornecedor({ nome: 'Beta SA', cnpj: '44.556.677/0001-86' });
 
     const porNome = await api().get('/api/fornecedores').query({ search: 'beta' }).set('Authorization', auth);
-    const porCnpj = await api().get('/api/fornecedores').query({ search: '11.111' }).set('Authorization', auth);
+    const porCnpj = await api().get('/api/fornecedores').query({ search: '11.122' }).set('Authorization', auth);
 
     expect(porNome.body.map((f: any) => f.nome)).toEqual(['Beta SA']);
     expect(porCnpj.body.map((f: any) => f.nome)).toEqual(['Alfa Ltda']);
@@ -76,10 +76,10 @@ describe('fornecedores', () => {
   });
 
   it('exige nome e rejeita CNPJ duplicado', async () => {
-    await criarFornecedor({ cnpj: '11.222.333/0001-44' });
+    await criarFornecedor({ cnpj: '11.222.333/0001-81' });
 
     const semNome = await api().post('/api/fornecedores').set('Authorization', auth).send({ cnpj: '99.999.999/0001-99' });
-    const duplicado = await api().post('/api/fornecedores').set('Authorization', auth).send({ nome: 'Outro', cnpj: '11.222.333/0001-44' });
+    const duplicado = await api().post('/api/fornecedores').set('Authorization', auth).send({ nome: 'Outro', cnpj: '11.222.333/0001-81' });
 
     expect(semNome.status).toBe(400);
     expect(duplicado.status).toBe(409);

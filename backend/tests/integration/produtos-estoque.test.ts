@@ -86,6 +86,24 @@ describe('produtos', () => {
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ error: 'Produto não encontrado' });
   });
+
+  it('remove por inativação: responde 204, mantém o registro e some da listagem', async () => {
+    const produto = await criarProduto({ nome: 'Descontinuado' });
+
+    const del = await api().delete(`/api/produtos/${produto.id}`).set('Authorization', auth);
+    expect(del.status).toBe(204);
+
+    const lista = await api().get('/api/produtos').set('Authorization', auth);
+    expect(lista.body.map((p: any) => p.id)).not.toContain(produto.id);
+
+    const rows = await query('SELECT ativo FROM produtos WHERE id=$1', [produto.id]);
+    expect(rows[0].ativo).toBe(false);
+  });
+
+  it('responde 404 ao excluir produto inexistente', async () => {
+    const res = await api().delete(`/api/produtos/${UUID_INEXISTENTE}`).set('Authorization', auth);
+    expect(res.status).toBe(404);
+  });
 });
 
 describe('ajuste manual de estoque', () => {

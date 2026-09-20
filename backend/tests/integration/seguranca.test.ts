@@ -115,10 +115,10 @@ describe('tratamento de erros em produção', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.stubEnv('NODE_ENV', 'production');
     const { auth } = await autenticar();
-    await criarCliente({ cpf_cnpj: '111.111.111-11' });
+    await criarCliente({ cpf_cnpj: '111.222.333-96' });
 
     const naoUuid = await api().get('/api/clientes/abc').set('Authorization', auth);
-    const duplicado = await api().post('/api/clientes').set('Authorization', auth).send({ nome: 'Outro', cpf_cnpj: '111.111.111-11' });
+    const duplicado = await api().post('/api/clientes').set('Authorization', auth).send({ nome: 'Outro', cpf_cnpj: '111.222.333-96' });
     const fkInexistente = await api().post('/api/vendas').set('Authorization', auth).send({
       cliente_id: UUID_INEXISTENTE,
       itens: [{ produto_id: (await criarProduto()).id, quantidade: 1, preco_unit: 10 }],

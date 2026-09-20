@@ -1,6 +1,28 @@
 import { Request, Response, NextFunction } from 'express';
 import pool from '../db/pool';
-import { textoObrigatorio } from '../utils/validacao';
+import {
+  textoObrigatorio,
+  cpfCnpjOpcional,
+  emailOpcional,
+  cepOpcional,
+  telefoneOpcional,
+  ufOpcional,
+  textoOpcional,
+} from '../utils/validacao';
+
+function validarCampos(body: unknown) {
+  const b = (body ?? {}) as Record<string, unknown>;
+  return {
+    nome: textoObrigatorio(b.nome, 'o nome'),
+    cnpj: cpfCnpjOpcional(b.cnpj, 'o CNPJ'),
+    email: emailOpcional(b.email),
+    telefone: telefoneOpcional(b.telefone),
+    endereco: textoOpcional(b.endereco, 500, 'o endereço'),
+    cidade: textoOpcional(b.cidade, 100, 'a cidade'),
+    estado: ufOpcional(b.estado),
+    cep: cepOpcional(b.cep),
+  };
+}
 
 export async function listar(req: Request, res: Response, next: NextFunction) {
   try {
@@ -31,8 +53,7 @@ export async function buscar(req: Request, res: Response, next: NextFunction) {
 
 export async function criar(req: Request, res: Response, next: NextFunction) {
   try {
-    const { cnpj, email, telefone, endereco, cidade, estado, cep } = req.body;
-    const nome = textoObrigatorio(req.body.nome, 'o nome');
+    const { nome, cnpj, email, telefone, endereco, cidade, estado, cep } = validarCampos(req.body);
     const { rows } = await pool.query(
       `INSERT INTO fornecedores (nome, cnpj, email, telefone, endereco, cidade, estado, cep)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
@@ -46,8 +67,8 @@ export async function criar(req: Request, res: Response, next: NextFunction) {
 
 export async function atualizar(req: Request, res: Response, next: NextFunction) {
   try {
-    const { cnpj, email, telefone, endereco, cidade, estado, cep, ativo } = req.body;
-    const nome = textoObrigatorio(req.body.nome, 'o nome');
+    const { nome, cnpj, email, telefone, endereco, cidade, estado, cep } = validarCampos(req.body);
+    const ativo = req.body?.ativo === undefined ? true : Boolean(req.body.ativo);
     const { rows } = await pool.query(
       `UPDATE fornecedores SET nome=$1,cnpj=$2,email=$3,telefone=$4,
        endereco=$5,cidade=$6,estado=$7,cep=$8,ativo=$9

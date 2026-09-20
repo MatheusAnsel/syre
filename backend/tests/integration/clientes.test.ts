@@ -14,10 +14,10 @@ describe('clientes', () => {
     const res = await api()
       .post('/api/clientes')
       .set('Authorization', auth)
-      .send({ nome: 'Padaria Central', cpf_cnpj: '12.345.678/0001-90', email: 'contato@padaria.com', cidade: 'Rio de Janeiro', estado: 'RJ' });
+      .send({ nome: 'Padaria Central', cpf_cnpj: '12.345.678/0001-95', email: 'contato@padaria.com', cidade: 'Rio de Janeiro', estado: 'RJ' });
 
     expect(res.status).toBe(201);
-    expect(res.body).toMatchObject({ nome: 'Padaria Central', cpf_cnpj: '12.345.678/0001-90', ativo: true });
+    expect(res.body).toMatchObject({ nome: 'Padaria Central', cpf_cnpj: '12.345.678/0001-95', ativo: true });
     expect(res.body.id).toMatch(/^[0-9a-f-]{36}$/);
   });
 
@@ -32,11 +32,11 @@ describe('clientes', () => {
   });
 
   it('busca por nome ou CPF/CNPJ sem diferenciar maiúsculas de minúsculas', async () => {
-    await criarCliente({ nome: 'Maria Silva', cpf_cnpj: '111.111.111-11' });
-    await criarCliente({ nome: 'João Souza', cpf_cnpj: '222.222.222-22' });
+    await criarCliente({ nome: 'Maria Silva', cpf_cnpj: '111.222.333-96' });
+    await criarCliente({ nome: 'João Souza', cpf_cnpj: '444.555.666-19' });
 
     const porNome = await api().get('/api/clientes').query({ search: 'maria' }).set('Authorization', auth);
-    const porDocumento = await api().get('/api/clientes').query({ search: '222.222' }).set('Authorization', auth);
+    const porDocumento = await api().get('/api/clientes').query({ search: '444.555' }).set('Authorization', auth);
 
     expect(porNome.body.map((c: any) => c.nome)).toEqual(['Maria Silva']);
     expect(porDocumento.body.map((c: any) => c.nome)).toEqual(['João Souza']);
@@ -137,5 +137,28 @@ describe('clientes', () => {
 
     expect(res.status).toBe(400);
     expect(res.body).toEqual({ error: 'JSON inválido no corpo da requisição' });
+  });
+
+  it.each([
+    ['cpf_cnpj', '111.111.111-11'],
+    ['cpf_cnpj', '123'],
+    ['email', 'nao-e-email'],
+    ['cep', '123'],
+    ['estado', 'XX'],
+    ['telefone', '123'],
+  ])('responde 400 quando %s é inválido', async (campo, valor) => {
+    const res = await api().post('/api/clientes').set('Authorization', auth).send({ nome: 'Teste', [campo]: valor });
+    expect(res.status).toBe(400);
+  });
+
+  it('aceita cliente só com o nome (todos os outros campos são opcionais)', async () => {
+    const res = await api().post('/api/clientes').set('Authorization', auth).send({ nome: 'Só Nome' });
+    expect(res.status).toBe(201);
+    expect(res.body.cpf_cnpj).toBeNull();
+  });
+
+  it('rejeita endereço maior que o limite de 500 caracteres', async () => {
+    const res = await api().post('/api/clientes').set('Authorization', auth).send({ nome: 'Teste', endereco: 'a'.repeat(501) });
+    expect(res.status).toBe(400);
   });
 });

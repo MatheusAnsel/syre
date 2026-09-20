@@ -102,9 +102,16 @@ export default function Clientes() {
               <FormGroup label="Endereço"><input value={form.endereco} onChange={f('endereco')} /></FormGroup>
             </div>
           </FormGrid>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }}>
-            <Button variant="ghost" onClick={() => setModal(false)}>Cancelar</Button>
-            <Button onClick={save}>Salvar</Button>
+          <div style={{ display: 'flex', justifyContent: editId ? 'space-between' : 'flex-end', gap: 10, marginTop: 24 }}>
+            {editId && (
+              <Button variant="danger" onClick={() => { remove(editId); setModal(false); }}>
+                <Trash2 size={14} />Excluir
+              </Button>
+            )}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Button variant="ghost" onClick={() => setModal(false)}>Cancelar</Button>
+              <Button onClick={save}>Salvar</Button>
+            </div>
           </div>
         </Modal>
       )}

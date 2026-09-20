@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { api } from '../lib/api';
 import { Produto, Fornecedor } from '../types';
 import { fmt } from '../lib/format';
@@ -55,6 +55,11 @@ export default function Produtos() {
     setEditId(p.id); setModal(true);
   };
 
+  const remove = async (id: string) => {
+    if (!confirm('Desativar produto?')) return;
+    await api.delete(`/produtos/${id}`); load();
+  };
+
   const f = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm(p => ({ ...p, [k]: e.target.value }));
 
@@ -101,7 +106,10 @@ export default function Produtos() {
                     <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--gray-600)' }}>{p.estoque_minimo} {p.unidade}</td>
                     <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--gray-400)' }}>{p.fornecedor_nome || '—'}</td>
                     <td style={{ padding: '12px 16px' }}>
-                      <Button variant="ghost" size="sm" onClick={() => edit(p)}><Pencil size={13} /></Button>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <Button variant="ghost" size="sm" onClick={() => edit(p)}><Pencil size={13} /></Button>
+                        <Button variant="ghost" size="sm" onClick={() => remove(p.id)}><Trash2 size={13} /></Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -140,9 +148,16 @@ export default function Produtos() {
               </FormGroup>
             </div>
           </FormGrid>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }}>
-            <Button variant="ghost" onClick={() => setModal(false)}>Cancelar</Button>
-            <Button onClick={save}>Salvar</Button>
+          <div style={{ display: 'flex', justifyContent: editId ? 'space-between' : 'flex-end', gap: 10, marginTop: 24 }}>
+            {editId && (
+              <Button variant="danger" onClick={() => { remove(editId); setModal(false); }}>
+                <Trash2 size={14} />Excluir
+              </Button>
+            )}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Button variant="ghost" onClick={() => setModal(false)}>Cancelar</Button>
+              <Button onClick={save}>Salvar</Button>
+            </div>
           </div>
         </Modal>
       )}

@@ -1,6 +1,28 @@
 import { Request, Response, NextFunction } from 'express';
 import pool from '../db/pool';
-import { ErroHttp, textoObrigatorio, numeroPositivo, milesimos } from '../utils/validacao';
+import {
+  ErroHttp,
+  textoObrigatorio,
+  textoOpcional,
+  numeroPositivo,
+  numeroNaoNegativoOpcional,
+  milesimos,
+} from '../utils/validacao';
+
+function validarCampos(body: unknown) {
+  const b = (body ?? {}) as Record<string, unknown>;
+  return {
+    nome: textoObrigatorio(b.nome, 'o nome'),
+    codigo: textoOpcional(b.codigo, 50, 'o código'),
+    descricao: textoOpcional(b.descricao, 5000, 'a descrição'),
+    categoria: textoOpcional(b.categoria, 100, 'a categoria'),
+    unidade: textoOpcional(b.unidade, 20, 'a unidade') || 'UN',
+    preco_custo: numeroNaoNegativoOpcional(b.preco_custo, 0, 'o preço de custo'),
+    preco_venda: numeroNaoNegativoOpcional(b.preco_venda, 0, 'o preço de venda'),
+    estoque_minimo: numeroNaoNegativoOpcional(b.estoque_minimo, 0, 'o estoque mínimo'),
+    fornecedor_id: b.fornecedor_id || null,
+  };
+}
 
 export async function listar(req: Request, res: Response, next: NextFunction) {
   try {
@@ -49,12 +71,12 @@ export async function buscar(req: Request, res: Response, next: NextFunction) {
 
 export async function criar(req: Request, res: Response, next: NextFunction) {
   try {
-    const { codigo, descricao, categoria, unidade, preco_custo, preco_venda, estoque_atual, estoque_minimo, fornecedor_id } = req.body;
-    const nome = textoObrigatorio(req.body.nome, 'o nome');
+    const { nome, codigo, descricao, categoria, unidade, preco_custo, preco_venda, estoque_minimo, fornecedor_id } = validarCampos(req.body);
+    const estoque_atual = numeroNaoNegativoOpcional(req.body?.estoque_atual, 0, 'o estoque atual');
     const { rows } = await pool.query(
       `INSERT INTO produtos (codigo,nome,descricao,categoria,unidade,preco_custo,preco_venda,estoque_atual,estoque_minimo,fornecedor_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-      [codigo, nome, descricao, categoria, unidade || 'UN', preco_custo || 0, preco_venda || 0, estoque_atual || 0, estoque_minimo || 0, fornecedor_id || null]
+      [codigo, nome, descricao, categoria, unidade, preco_custo, preco_venda, estoque_atual, estoque_minimo, fornecedor_id]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -64,13 +86,13 @@ export async function criar(req: Request, res: Response, next: NextFunction) {
 
 export async function atualizar(req: Request, res: Response, next: NextFunction) {
   try {
-    const { codigo, descricao, categoria, unidade, preco_custo, preco_venda, estoque_minimo, fornecedor_id, ativo } = req.body;
-    const nome = textoObrigatorio(req.body.nome, 'o nome');
+    const { nome, codigo, descricao, categoria, unidade, preco_custo, preco_venda, estoque_minimo, fornecedor_id } = validarCampos(req.body);
+    const ativo = req.body?.ativo === undefined ? true : Boolean(req.body.ativo);
     const { rows } = await pool.query(
       `UPDATE produtos SET codigo=$1,nome=$2,descricao=$3,categoria=$4,unidade=$5,
        preco_custo=$6,preco_venda=$7,estoque_minimo=$8,fornecedor_id=$9,ativo=$10
        WHERE id=$11 RETURNING *`,
-      [codigo, nome, descricao, categoria, unidade, preco_custo, preco_venda, estoque_minimo, fornecedor_id || null, ativo, req.params.id]
+      [codigo, nome, descricao, categoria, unidade, preco_custo, preco_venda, estoque_minimo, fornecedor_id, ativo, req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Produto não encontrado' });
     res.json(rows[0]);
@@ -132,6 +154,19 @@ export async function movimentacoes(req: Request, res: Response, next: NextFunct
       [req.params.id]
     );
     res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function remover(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { rows } = await pool.query(
+      'UPDATE produtos SET ativo=false WHERE id=$1 RETURNING id',
+      [req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Produto não encontrado' });
+    res.status(204).send();
   } catch (err) {
     next(err);
   }

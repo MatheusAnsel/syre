@@ -32,6 +32,7 @@ router.post('/produtos', produtos.criar);
 router.put('/produtos/:id', produtos.atualizar);
 router.post('/produtos/:id/estoque', produtos.ajustarEstoque);
 router.get('/produtos/:id/movimentacoes', produtos.movimentacoes);
+router.delete('/produtos/:id', produtos.remover);
 
 // Vendas
 router.get('/vendas', vendas.listar);

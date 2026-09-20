@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import pool from '../db/pool';
-import { ErroHttp, textoObrigatorio, numeroPositivo, centavos } from '../utils/validacao';
+import { ErroHttp, textoObrigatorio, numeroPositivo, centavos, dataObrigatoria } from '../utils/validacao';
 
 export async function listar(req: Request, res: Response, next: NextFunction) {
   try {
@@ -39,9 +39,10 @@ export async function buscar(req: Request, res: Response, next: NextFunction) {
 
 export async function criar(req: Request, res: Response, next: NextFunction) {
   try {
-    const { cliente_id, vencimento } = req.body;
+    const { cliente_id } = req.body;
     const descricao = textoObrigatorio(req.body.descricao, 'a descrição');
     const valor = numeroPositivo(req.body.valor, 'o valor');
+    const vencimento = dataObrigatoria(req.body.vencimento, 'o vencimento');
     const { rows } = await pool.query(
       `INSERT INTO contas_receber (cliente_id, descricao, valor, vencimento)
        VALUES ($1,$2,$3,$4) RETURNING *`,

@@ -147,7 +147,9 @@ Frontend, backend e banco em provedores separados — de propósito, para deixar
    DATABASE_URL="<connection-string-do-supabase>" NODE_ENV=production npm run migrate
    DATABASE_URL="<connection-string-do-supabase>" ADMIN_NOME="Seu Nome" ADMIN_EMAIL="voce@exemplo.com" ADMIN_SENHA='senha-forte' npm run create-admin
    ```
-3. Criar um **Web Service** no [Render](https://render.com) apontando para a pasta `backend/` deste repositório (build: `npm install && npm run build`, start: `npm start`)
+3. Criar um **Web Service** no [Render](https://render.com) apontando para a pasta `backend/` deste repositório (build: `npm install --include=dev && npm run build`, start: `npm start`)
+
+   > O `--include=dev` é necessário porque a variável `NODE_ENV=production` (configurada no passo 4) também vale durante o build, e o `npm install` sem essa flag pula as devDependencies — incluindo os `@types/*` que o `tsc` precisa para compilar. Sem isso, o build falha com erros `TS7016`/`TS2591`.
 4. Configurar as variáveis de ambiente no Render:
    ```env
    DATABASE_URL=<connection-string-do-supabase>

@@ -44,14 +44,14 @@ Ponto que tratei com atenção especial, por ser um sistema com dados de cliente
 - **Rate limiting**: geral na API e mais restrito no login, contra força bruta
 - **Helmet** (headers HTTP de segurança) e **CORS** restrito à origem do frontend em produção
 - Mensagens de erro genéricas em produção — detalhes internos (SQL, stack trace) nunca chegam ao cliente
-- Conexão com PostgreSQL via SSL em produção (Railway)
+- Conexão com PostgreSQL via SSL em produção (Supabase)
 
 ## Stack
 
 - **Frontend:** React 18, TypeScript, Vite, React Router, Recharts
 - **Backend:** Node.js, Express, TypeScript, JWT, bcrypt, Helmet
 - **Banco:** PostgreSQL — 8 tabelas, UUIDs, triggers automáticos (baixa de estoque, `atualizado_em`)
-- **Deploy:** Vercel (frontend) + Railway (backend/DB)
+- **Deploy:** Vercel (frontend) + Render (backend) + Supabase (PostgreSQL)
 
 ## Pré-requisitos
 
@@ -111,6 +111,52 @@ ADMIN_NOME="Seu Nome" ADMIN_EMAIL="voce@exemplo.com" ADMIN_SENHA='senha-forte' n
 
 > Se a senha tiver `#`, `$` ou espaços, use aspas simples como no exemplo acima —
 > sem aspas, o dotenv corta a variável no primeiro `#` ao ler o `.env`.
+
+## Deploy em produção
+
+Frontend, backend e banco em provedores separados — de propósito, para deixar explícito que cada camada é implantada de forma independente:
+
+```
+                    ┌──────────────┐
+                    │    Vercel    │
+                    │   Frontend   │
+                    │ React + Vite │
+                    └──────┬───────┘
+                           │ HTTPS
+                           ▼
+                    ┌──────────────┐
+                    │    Render    │
+                    │   Backend    │
+                    │ Node + Express│
+                    └──────┬───────┘
+                           │ PostgreSQL (SSL)
+                           ▼
+                    ┌──────────────┐
+                    │   Supabase   │
+                    │  PostgreSQL  │
+                    └──────────────┘
+```
+
+**Por quê essa combinação:** o PostgreSQL gratuito do próprio Render expira após 30 dias; o Supabase Free oferece banco persistente (com pausa automática após 1 semana sem uso, reativada no primeiro acesso). Render Free é adequado para portfólio/demonstração, não para produção crítica — sofre cold start e restart.
+
+**Passo a passo:**
+
+1. Criar um projeto PostgreSQL no [Supabase](https://supabase.com) e copiar a *connection string* do modo **Transaction pooler** (Project Settings → Database)
+2. Rodar as migrations e criar o usuário admin apontando `DATABASE_URL` para essa connection string:
+   ```bash
+   DATABASE_URL="<connection-string-do-supabase>" NODE_ENV=production npm run migrate
+   DATABASE_URL="<connection-string-do-supabase>" ADMIN_NOME="Seu Nome" ADMIN_EMAIL="voce@exemplo.com" ADMIN_SENHA='senha-forte' npm run create-admin
+   ```
+3. Criar um **Web Service** no [Render](https://render.com) apontando para a pasta `backend/` deste repositório (build: `npm install && npm run build`, start: `npm start`)
+4. Configurar as variáveis de ambiente no Render:
+   ```env
+   DATABASE_URL=<connection-string-do-supabase>
+   JWT_SECRET=<valor-aleatorio-forte>
+   FRONTEND_URL=https://seu-frontend.vercel.app
+   NODE_ENV=production
+   ```
+5. Publicar o frontend na Vercel com `VITE_API_URL` apontando para a URL pública do Render
+6. Testar login, vendas, estoque e contas a receber em produção
 
 ## Testes e integração contínua
 

@@ -10,7 +10,7 @@ import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
 
-app.set('trust proxy', 1); // necessário atrás do proxy do Railway p/ rate-limit funcionar
+app.set('trust proxy', 1); // necessário atrás do proxy da plataforma de deploy (Render, Railway etc.) p/ rate-limit funcionar
 
 app.use(helmet());
 app.use(

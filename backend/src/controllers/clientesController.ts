@@ -34,10 +34,9 @@ export async function listar(req: Request, res: Response, next: NextFunction) {
       params.push(`%${search}%`);
       query += ` AND (nome ILIKE $${params.length} OR cpf_cnpj ILIKE $${params.length})`;
     }
-    if (ativo !== undefined) {
-      params.push(ativo === 'true');
-      query += ` AND ativo = $${params.length}`;
-    }
+    // Por padrão só lista clientes ativos — quem quiser ver inativos passa ?ativo=false explicitamente.
+    params.push(ativo === undefined ? true : ativo === 'true');
+    query += ` AND ativo = $${params.length}`;
     query += ' ORDER BY nome';
 
     const { rows } = await pool.query(query, params);

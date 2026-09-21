@@ -53,6 +53,20 @@ describe('clientes', () => {
     expect(inativos.body.map((c: any) => c.nome)).toEqual(['Inativo']);
   });
 
+  it('listagem sem filtro mostra só ativos por padrão, e some depois de excluir', async () => {
+    await criarCliente({ nome: 'Vai ficar' });
+    const removido = await criarCliente({ nome: 'Vai sair' });
+
+    const antes = await api().get('/api/clientes').set('Authorization', auth);
+    expect(antes.body.map((c: any) => c.nome).sort()).toEqual(['Vai ficar', 'Vai sair']);
+
+    const del = await api().delete(`/api/clientes/${removido.id}`).set('Authorization', auth);
+    expect(del.status).toBe(204);
+
+    const depois = await api().get('/api/clientes').set('Authorization', auth);
+    expect(depois.body.map((c: any) => c.nome)).toEqual(['Vai ficar']);
+  });
+
   it('busca um cliente por id e responde 404 quando não existe', async () => {
     const cliente = await criarCliente({ nome: 'Carlos' });
 

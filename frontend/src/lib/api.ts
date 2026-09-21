@@ -1,3 +1,5 @@
+import { notify } from './toast';
+
 const BASE = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api`
   : '/api';
@@ -38,7 +40,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     const mensagem = err.error || 'Erro na requisição';
     // Ações de gravação avisam o usuário (ex.: estoque insuficiente). A tela de login exibe o erro por conta própria.
     const gravacao = options?.method && options.method !== 'GET';
-    if (gravacao && !path.startsWith('/auth/')) window.alert(mensagem);
+    if (gravacao && !path.startsWith('/auth/')) notify(mensagem, 'error');
     throw new Error(mensagem);
   }
   if (res.status === 204) return {} as T;

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, CheckCircle } from 'lucide-react';
 import { api } from '../lib/api';
+import { notify } from '../lib/toast';
 import { ContaReceber, Cliente } from '../types';
 import { fmt } from '../lib/format';
 import {
@@ -58,7 +59,7 @@ export default function ContasReceber() {
 
   const marcarVencidas = async () => {
     const res = await api.post<{ atualizadas: number }>('/contas-receber/marcar-vencidas', {});
-    alert(`${res.atualizadas} conta(s) marcada(s) como vencida(s).`);
+    notify(`${res.atualizadas} conta(s) marcada(s) como vencida(s).`, 'success');
     load();
   };
 

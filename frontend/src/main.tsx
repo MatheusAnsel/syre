@@ -6,6 +6,7 @@ import './index.css';
 import { AuthProvider } from './lib/auth';
 import RequireAuth from './components/layout/RequireAuth';
 import Layout from './components/layout/Layout';
+import { ToastContainer } from './components/ui/ToastContainer';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Clientes from './pages/Clientes';
@@ -19,6 +20,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
+        <ToastContainer />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route element={

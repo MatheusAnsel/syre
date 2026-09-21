@@ -12,11 +12,13 @@
 [![JWT](https://img.shields.io/badge/Auth-JWT-black?style=flat-square&logo=jsonwebtokens)](#)
 [![CI](https://github.com/MatheusAnsel/syre/actions/workflows/ci.yml/badge.svg)](https://github.com/MatheusAnsel/syre/actions/workflows/ci.yml)
 
-[Portfólio](https://matheusansel-dev.vercel.app) · [LinkedIn](https://linkedin.com/in/matheusansel)
+[Demo ao vivo](https://syre-six.vercel.app) · [Portfólio](https://matheusansel-dev.vercel.app) · [LinkedIn](https://linkedin.com/in/matheusansel)
 
 </div>
 
 ---
+
+> A demo exige login (é a própria autenticação JWT em ação) e está com dados fictícios de demonstração. Se quiser acessar, me chame pelo LinkedIn.
 
 ## Sobre o projeto
 
@@ -41,14 +43,27 @@ Ponto que tratei com atenção especial, por ser um sistema com dados de cliente
 
 - **Autenticação JWT** obrigatória em toda a API (só `/api/auth/login` é público)
 - **bcrypt** para hash de senha, com resposta idêntica para "usuário não existe" e "senha errada" (evita enumeração de e-mails)
+- **Validação de campos com regras reais, não só formato**: CPF e CNPJ passam pelo algoritmo de dígito verificador (módulo 11) — rejeita números como `111.111.111-11`, que têm o formato certo mas não existem; e-mail, CEP, telefone e UF (as 27 siglas) também validados antes de qualquer escrita no banco
 - **Rate limiting**: geral na API e mais restrito no login, contra força bruta
 - **Helmet** (headers HTTP de segurança) e **CORS** restrito à origem do frontend em produção
 - Mensagens de erro genéricas em produção — detalhes internos (SQL, stack trace) nunca chegam ao cliente
 - Conexão com PostgreSQL via SSL em produção (Supabase)
 
+## Problemas reais encontrados e corrigidos
+
+Nem tudo funcionou de primeira. Documentar isso é mais honesto (e mais interessante) do que fingir que não teve:
+
+| Problema | Como foi encontrado | Correção |
+|---|---|---|
+| Cliente "excluído" continuava na listagem | O soft-delete funcionava (`ativo=false`), mas o `GET /clientes` só filtrava por ativo se o parâmetro fosse passado explicitamente | Listagem passou a filtrar `ativo=true` por padrão; adicionado teste de regressão cobrindo o cenário exato |
+| Lockfile do frontend quebraria o deploy | `package-lock.json` commitado estava vazio (`{"packages": {}}`) — a Vercel roda `npm ci`, que falha se o lockfile não bate com o `package.json` | Lockfile regenerado com as dependências reais |
+| Build falhava no Render | `NODE_ENV=production` (necessário em runtime) também afeta o `npm install` do build, que pula `devDependencies` — incluindo os `@types/*` que o `tsc` precisa | Build command ajustado para `npm install --include=dev` |
+| CPF/CNPJ fictícios passavam a validação | Ao implementar o dígito verificador (módulo 11) de verdade, os próprios fixtures de teste usavam números como `111.111.111-11` — formato certo, mas inválidos | Validação com checksum real; fixtures de teste substituídos por números que realmente existem |
+| Dependência não usada com vulnerabilidade | `npm audit` apontou uma falha em `uuid`, que nunca era importado no código (os IDs vêm do `uuid_generate_v4()` do próprio Postgres) | Removida em vez de só atualizada — eliminou a superfície de ataque |
+
 ## Stack
 
-- **Frontend:** React 18, TypeScript, Vite, React Router, Recharts
+- **Frontend:** React 18, TypeScript, Vite, React Router 7, Recharts, sistema de notificações (toast) próprio — sem lib externa
 - **Backend:** Node.js, Express, TypeScript, JWT, bcrypt, Helmet
 - **Banco:** PostgreSQL — 8 tabelas, UUIDs, triggers automáticos (baixa de estoque, `atualizado_em`)
 - **Deploy:** Vercel (frontend) + Render (backend) + Supabase (PostgreSQL)
@@ -87,6 +102,16 @@ npm run dev
 ```
 
 O frontend roda em `http://localhost:5173` e faz proxy para a API em `http://localhost:3001`.
+
+### Dados de teste (opcional)
+
+Para popular o sistema com dados fictícios (10 clientes, 10 fornecedores, 12 produtos, 10 vendas com contas a receber geradas automaticamente, movimentações de estoque):
+
+```bash
+SYRE_API_URL=http://localhost:3001 SYRE_EMAIL=voce@exemplo.com SYRE_SENHA='sua-senha' node scripts/seed-teste.mjs
+```
+
+O script cria tudo através da própria API (respeitando autenticação e validações reais), não escreve direto no banco.
 
 ## Variáveis de ambiente (backend)
 
@@ -162,7 +187,7 @@ Frontend, backend e banco em provedores separados — de propósito, para deixar
 
 ## Testes e integração contínua
 
-O backend tem testes unitários (middlewares e validações) e de integração com Vitest e Supertest, executados contra um PostgreSQL real. Isso permite verificar triggers, transações e restrições do banco, não apenas as rotas.
+O backend tem 231 testes (unitários e de integração, Vitest + Supertest) executados contra um PostgreSQL real. Isso permite verificar triggers, transações e restrições do banco, não apenas as rotas.
 
 Cobertura funcional principal:
 
@@ -217,10 +242,12 @@ DELETE /api/clientes/:id
 GET    /api/fornecedores
 POST   /api/fornecedores
 PUT    /api/fornecedores/:id
+DELETE /api/fornecedores/:id
 
 GET    /api/produtos
 POST   /api/produtos
 PUT    /api/produtos/:id
+DELETE /api/produtos/:id
 POST   /api/produtos/:id/estoque
 GET    /api/produtos/:id/movimentacoes
 

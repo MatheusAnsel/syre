@@ -20,6 +20,19 @@
 
 > A demo exige login (é a própria autenticação JWT em ação) e está com dados fictícios de demonstração. Se quiser acessar, me chame pelo LinkedIn.
 
+## Screenshots
+
+<table>
+<tr>
+<td><img src="docs/screenshots/dashboard.png" alt="Dashboard com KPIs e gráfico de vendas" width="420"/></td>
+<td><img src="docs/screenshots/clientes.png" alt="Listagem de clientes" width="420"/></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/produtos.png" alt="Listagem de produtos com estoque" width="420"/></td>
+<td><img src="docs/screenshots/vendas.png" alt="Listagem de vendas por status" width="420"/></td>
+</tr>
+</table>
+
 ## Sobre o projeto
 
 O Syre nasceu como um estudo de caso real: construir, do zero, um ERP financeiro simplificado cobrindo todo o ciclo — cadastro de clientes e fornecedores, controle de estoque, registro de vendas e cobrança de contas a receber — com a preocupação de deixá-lo pronto para produção, não só "funcionando na máquina local".
@@ -60,11 +73,12 @@ Nem tudo funcionou de primeira. Documentar isso é mais honesto (e mais interess
 | Build falhava no Render | `NODE_ENV=production` (necessário em runtime) também afeta o `npm install` do build, que pula `devDependencies` — incluindo os `@types/*` que o `tsc` precisa | Build command ajustado para `npm install --include=dev` |
 | CPF/CNPJ fictícios passavam a validação | Ao implementar o dígito verificador (módulo 11) de verdade, os próprios fixtures de teste usavam números como `111.111.111-11` — formato certo, mas inválidos | Validação com checksum real; fixtures de teste substituídos por números que realmente existem |
 | Dependência não usada com vulnerabilidade | `npm audit` apontou uma falha em `uuid`, que nunca era importado no código (os IDs vêm do `uuid_generate_v4()` do próprio Postgres) | Removida em vez de só atualizada — eliminou a superfície de ataque |
+| Login com senha errada mostrava "Sessão expirada" | Ao escrever o teste de integração da tela de login, o mock de credenciais inválidas (401) revelou que o cliente HTTP tratava *todo* 401 como sessão expirada, inclusive o de login — a mensagem real da API nunca chegava à tela | Rotas `/auth/*` excluídas desse tratamento; a mensagem que a API manda (`Credenciais inválidas`) agora chega ao usuário |
 
 ## Stack
 
-- **Frontend:** React 18, TypeScript, Vite, React Router 7, Recharts, sistema de notificações (toast) próprio — sem lib externa
-- **Backend:** Node.js, Express, TypeScript, JWT, bcrypt, Helmet
+- **Frontend:** React 18, TypeScript, Vite, React Router 7, Recharts, sistema de notificações (toast) próprio — sem lib externa; testes com Vitest + React Testing Library
+- **Backend:** Node.js, Express, TypeScript, JWT, bcrypt, Helmet; testes com Vitest + Supertest
 - **Banco:** PostgreSQL — 8 tabelas, UUIDs, triggers automáticos (baixa de estoque, `atualizado_em`)
 - **Deploy:** Vercel (frontend) + Render (backend) + Supabase (PostgreSQL)
 
@@ -187,9 +201,9 @@ Frontend, backend e banco em provedores separados — de propósito, para deixar
 
 ## Testes e integração contínua
 
-O backend tem 231 testes (unitários e de integração, Vitest + Supertest) executados contra um PostgreSQL real. Isso permite verificar triggers, transações e restrições do banco, não apenas as rotas.
+248 testes no total. Os 231 do backend (unitários e de integração, Vitest + Supertest) rodam contra um PostgreSQL real — verificam triggers, transações e restrições do banco, não apenas as rotas. Os 17 do frontend (Vitest + React Testing Library) cobrem login, proteção de rotas e o tratamento de erro da API — simulando digitação e clique reais, não só chamando funções isoladas.
 
-Cobertura funcional principal:
+Cobertura funcional principal (backend):
 
 - autenticação, expiração e adulteração de token, rate limit do login e exigência de token em todas as rotas
 - vendas: cálculo no servidor, estoque insuficiente, atomicidade da transação e cancelamento com devolução de estoque
@@ -203,7 +217,12 @@ cd backend
 npm test
 ```
 
-O workflow em `.github/workflows/ci.yml` executa verificação de tipos, testes com cobertura e build do backend, além do build do frontend, a cada push e pull request. A variável `TEST_DATABASE_URL` permite apontar para outro banco de testes.
+```bash
+cd frontend
+npm test
+```
+
+O workflow em `.github/workflows/ci.yml` executa verificação de tipos, testes com cobertura e build do backend, além de testes e build do frontend, a cada push e pull request. A variável `TEST_DATABASE_URL` permite apontar para outro banco de testes.
 
 ## Scripts
 

@@ -15,7 +15,9 @@ app.set('trust proxy', 1); // necessário atrás do proxy da plataforma de deplo
 app.use(helmet());
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || '*',
+    // Nunca cai para '*': sem FRONTEND_URL só o frontend local de desenvolvimento é aceito.
+    // Em produção, src/index.ts impede a API de iniciar sem essa variável.
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   })
 );
 app.use(express.json());

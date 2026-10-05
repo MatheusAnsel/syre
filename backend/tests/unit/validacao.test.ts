@@ -121,7 +121,7 @@ describe('telefoneOpcional', () => {
   it('aceita ausência, 10 ou 11 dígitos', () => {
     expect(telefoneOpcional(undefined)).toBeNull();
     expect(telefoneOpcional('(21) 3333-4444')).toBe('(21) 3333-4444');
-    expect(telefoneOpcional('(21) 98691-9858')).toBe('(21) 98691-9858');
+    expect(telefoneOpcional('(21) 91234-5678')).toBe('(21) 91234-5678');
   });
 
   it.each([['123'], ['(21) 1234-567'], [42]])('rejeita %s', (valor) => {

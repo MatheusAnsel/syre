@@ -4,7 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import routes from './routes';
-import { login, me } from './controllers/authController';
+import { login, logout, me, refresh } from './controllers/authController';
 import { requireAuth } from './middleware/requireAuth';
 import { errorHandler } from './middleware/errorHandler';
 
@@ -40,9 +40,20 @@ const loginLimiter = rateLimit({
   message: { error: 'Muitas tentativas de login. Tente novamente mais tarde.' },
 });
 
+// Renovação de sessão: limite próprio, mais folgado que o do login (o frontend renova sozinho).
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas renovações de sessão. Tente novamente mais tarde.' },
+});
+
 app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'Syre API' }));
 
 app.post('/api/auth/login', loginLimiter, login);
+app.post('/api/auth/refresh', refreshLimiter, refresh);
+app.post('/api/auth/logout', logout);
 app.get('/api/auth/me', requireAuth, me);
 
 app.use('/api', requireAuth, routes);

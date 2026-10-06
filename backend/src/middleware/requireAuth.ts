@@ -15,9 +15,16 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   }
 
   try {
-    const payload = jwt.verify(token, secret) as { sub: string; email: string };
+    // Aceita só HS256: impede troca de algoritmo no cabeçalho do token.
+    const payload = jwt.verify(token, secret, { algorithms: ['HS256'] }) as {
+      sub: string;
+      email: string;
+      perfil?: string;
+    };
     (req as any).userId = payload.sub;
     (req as any).userEmail = payload.email;
+    // Tokens sem perfil (emitidos antes dos perfis existirem) caem no menor privilégio.
+    (req as any).userPerfil = payload.perfil === 'admin' ? 'admin' : 'operador';
     next();
   } catch {
     return res.status(401).json({ error: 'Sessão inválida ou expirada' });

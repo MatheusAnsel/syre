@@ -21,9 +21,9 @@ async function createAdmin() {
   const senha_hash = await bcrypt.hash(senha, 10);
 
   await pool.query(
-    `INSERT INTO usuarios (nome, email, senha_hash)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (email) DO UPDATE SET senha_hash = EXCLUDED.senha_hash, nome = EXCLUDED.nome`,
+    `INSERT INTO usuarios (nome, email, senha_hash, perfil)
+     VALUES ($1, $2, $3, 'admin')
+     ON CONFLICT (email) DO UPDATE SET senha_hash = EXCLUDED.senha_hash, nome = EXCLUDED.nome, perfil = 'admin'`,
     [nome, email, senha_hash]
   );
 

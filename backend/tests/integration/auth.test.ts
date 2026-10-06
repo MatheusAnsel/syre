@@ -9,18 +9,21 @@ beforeEach(resetDb);
 afterAll(closeDb);
 
 describe('POST /api/auth/login', () => {
-  it('autentica com credenciais válidas e devolve token de 12h sem expor a senha', async () => {
+  it('autentica com credenciais válidas e devolve access token de 15 minutos e refresh token, sem expor a senha', async () => {
     const usuario = await criarUsuario();
 
     const res = await api().post('/api/auth/login').send({ email: usuario.email, senha: usuario.senha });
 
     expect(res.status).toBe(200);
-    expect(res.body.usuario).toEqual({ id: usuario.id, nome: usuario.nome, email: usuario.email });
+    expect(res.body.usuario).toEqual({ id: usuario.id, nome: usuario.nome, email: usuario.email, perfil: 'admin' });
+    expect(typeof res.body.refreshToken).toBe('string');
+    expect(res.body.expiresIn).toBe(15 * 60);
     expect(JSON.stringify(res.body)).not.toMatch(/senha_hash|\$2[aby]\$/);
 
     const payload = jwt.verify(res.body.token, process.env.JWT_SECRET as string) as jwt.JwtPayload;
     expect(payload.sub).toBe(usuario.id);
-    expect((payload.exp as number) - (payload.iat as number)).toBe(12 * 60 * 60);
+    expect(payload.perfil).toBe('admin');
+    expect((payload.exp as number) - (payload.iat as number)).toBe(15 * 60);
   });
 
   it('normaliza o e-mail (espaços e maiúsculas)', async () => {
@@ -69,7 +72,7 @@ describe('GET /api/auth/me', () => {
     const res = await api().get('/api/auth/me').set('Authorization', auth);
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ id: usuario.id, nome: usuario.nome, email: usuario.email });
+    expect(res.body).toEqual({ id: usuario.id, nome: usuario.nome, email: usuario.email, perfil: 'admin' });
   });
 
   it('responde 401 sem token', async () => {
@@ -93,6 +96,16 @@ describe('GET /api/auth/me', () => {
     const falso = gerarToken(usuario, { expiresIn: '1h' }, 'segredo-do-atacante');
 
     const res = await api().get('/api/auth/me').set('Authorization', `Bearer ${falso}`);
+
+    expect(res.status).toBe(401);
+  });
+
+  it('recusa token assinado com outro algoritmo (alg: none)', async () => {
+    const usuario = await criarUsuario();
+    const cabecalho = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url');
+    const corpo = Buffer.from(JSON.stringify({ sub: usuario.id, email: usuario.email, perfil: 'admin' })).toString('base64url');
+
+    const res = await api().get('/api/auth/me').set('Authorization', `Bearer ${cabecalho}.${corpo}.`);
 
     expect(res.status).toBe(401);
   });

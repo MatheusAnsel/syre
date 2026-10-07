@@ -5,8 +5,10 @@ import * as produtos from '../controllers/produtosController';
 import * as vendas from '../controllers/vendasController';
 import * as contasReceber from '../controllers/contasReceberController';
 import { getDashboard } from '../controllers/dashboardController';
+import { requirePerfil, exigirAdminParaCancelar } from '../middleware/requirePerfil';
 
 const router = Router();
+const somenteAdmin = requirePerfil('admin');
 
 // Dashboard
 router.get('/dashboard', getDashboard);
@@ -16,14 +18,14 @@ router.get('/clientes', clientes.listar);
 router.get('/clientes/:id', clientes.buscar);
 router.post('/clientes', clientes.criar);
 router.put('/clientes/:id', clientes.atualizar);
-router.delete('/clientes/:id', clientes.remover);
+router.delete('/clientes/:id', somenteAdmin, clientes.remover);
 
 // Fornecedores
 router.get('/fornecedores', fornecedores.listar);
 router.get('/fornecedores/:id', fornecedores.buscar);
 router.post('/fornecedores', fornecedores.criar);
 router.put('/fornecedores/:id', fornecedores.atualizar);
-router.delete('/fornecedores/:id', fornecedores.remover);
+router.delete('/fornecedores/:id', somenteAdmin, fornecedores.remover);
 
 // Produtos / Estoque
 router.get('/produtos', produtos.listar);
@@ -32,13 +34,13 @@ router.post('/produtos', produtos.criar);
 router.put('/produtos/:id', produtos.atualizar);
 router.post('/produtos/:id/estoque', produtos.ajustarEstoque);
 router.get('/produtos/:id/movimentacoes', produtos.movimentacoes);
-router.delete('/produtos/:id', produtos.remover);
+router.delete('/produtos/:id', somenteAdmin, produtos.remover);
 
 // Vendas
 router.get('/vendas', vendas.listar);
 router.get('/vendas/:id', vendas.buscar);
 router.post('/vendas', vendas.criar);
-router.patch('/vendas/:id/status', vendas.atualizarStatus);
+router.patch('/vendas/:id/status', exigirAdminParaCancelar, vendas.atualizarStatus);
 
 // Contas a Receber
 router.get('/contas-receber', contasReceber.listar);

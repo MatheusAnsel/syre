@@ -2,7 +2,7 @@
 
 # Syre
 
-**Sistema de controle financeiro full-stack** — clientes, fornecedores, estoque, vendas e contas a receber, com autenticação JWT e API REST própria.
+**Sistema de controle financeiro full-stack** — clientes, fornecedores, estoque, vendas e contas a receber, com autenticação JWT (refresh token e perfis de acesso) e API REST documentada em OpenAPI.
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)](#)
 [![React](https://img.shields.io/badge/React_18-61DAFB?style=flat-square&logo=react&logoColor=black)](#)
@@ -11,6 +11,9 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white)](#)
 [![JWT](https://img.shields.io/badge/Auth-JWT-black?style=flat-square&logo=jsonwebtokens)](#)
 [![CI](https://github.com/MatheusAnsel/syre/actions/workflows/ci.yml/badge.svg)](https://github.com/MatheusAnsel/syre/actions/workflows/ci.yml)
+[![Cobertura](https://img.shields.io/badge/cobertura-m%C3%ADnimo%2092%25%20exigido%20no%20CI-brightgreen?style=flat-square)](#testes-e-integração-contínua)
+[![Docker](https://img.shields.io/badge/Docker-compose-2496ED?style=flat-square&logo=docker&logoColor=white)](#início-rápido-com-docker)
+[![OpenAPI](https://img.shields.io/badge/OpenAPI-3.0-6BA539?style=flat-square&logo=openapiinitiative&logoColor=white)](#documentação-da-api)
 
 [Demo ao vivo](https://syre-six.vercel.app) · [Portfólio](https://matheusansel-dev.vercel.app) · [LinkedIn](https://linkedin.com/in/matheusansel)
 
@@ -50,14 +53,115 @@ Isso significou ir além do CRUD: implementar **autenticação JWT em toda a API
 | **Vendas** | Múltiplos itens, desconto, total calculado no servidor, recusa venda sem estoque, baixa automática via trigger e devolução do estoque ao cancelar |
 | **Contas a Receber** | Geração automática por venda, recebimento parcial ou total (nunca acima do saldo), marcação de vencidas |
 
+## Arquitetura
+
+```mermaid
+flowchart LR
+    U[Navegador] -->|HTTPS| F[Frontend<br/>React + Vite]
+    F -->|/api| A
+
+    subgraph API [API Node.js + Express]
+        direction TB
+        A[helmet, CORS e rate limit] --> R[requireAuth<br/>JWT HS256]
+        R --> P[requirePerfil<br/>admin / operador]
+        P --> C[Controllers<br/>validação de entrada]
+        C --> S[Regras de negócio<br/>transações]
+    end
+
+    S -->|pg, SSL em produção| D[(PostgreSQL)]
+    A -.->|público| DOC[Swagger UI<br/>/api/docs]
+```
+
+Camadas separadas de propósito: o frontend nunca fala com o banco, toda regra de negócio (cálculo de totais, baixa de estoque, geração da conta a receber) roda no servidor dentro de transação, e a autorização é checada na API, não na tela.
+
+### Sessão e renovação do token
+
+```mermaid
+sequenceDiagram
+    participant N as Navegador
+    participant A as API
+    participant B as PostgreSQL
+
+    N->>A: POST /api/auth/login (email, senha)
+    A->>B: valida a senha (bcrypt) e grava o hash do refresh token
+    A-->>N: access token (15 min) + refresh token (7 dias)
+
+    N->>A: GET /api/clientes (access token válido)
+    A-->>N: 200
+
+    N->>A: GET /api/clientes (access token vencido)
+    A-->>N: 401
+    N->>A: POST /api/auth/refresh (refresh token)
+    A->>B: revoga o token usado e grava um novo na mesma sessão
+    A-->>N: par novo de tokens
+    N->>A: GET /api/clientes (repete com o token novo)
+    A-->>N: 200
+
+    Note over N,A: Reapresentar um refresh token já usado revoga a sessão inteira
+```
+
+### Modelo de dados
+
+```mermaid
+erDiagram
+    usuarios ||--o{ refresh_tokens : "possui sessões"
+    clientes ||--o{ vendas : realiza
+    clientes ||--o{ contas_receber : deve
+    vendas ||--|{ itens_venda : contém
+    vendas ||--o{ contas_receber : gera
+    produtos ||--o{ itens_venda : "é vendido em"
+    produtos ||--o{ movimentacoes_estoque : movimenta
+    fornecedores ||--o{ produtos : fornece
+
+    usuarios {
+        uuid id PK
+        string email UK
+        string perfil "admin ou operador"
+        bool ativo
+    }
+    refresh_tokens {
+        uuid id PK
+        uuid usuario_id FK
+        uuid familia_id "uma por login"
+        char token_hash UK "só o hash é guardado"
+        timestamptz expira_em
+        timestamptz revogado_em
+    }
+    produtos {
+        uuid id PK
+        string codigo UK
+        numeric estoque_atual
+        numeric estoque_minimo
+        uuid fornecedor_id FK
+    }
+    vendas {
+        uuid id PK
+        int numero
+        uuid cliente_id FK
+        string status "pendente, concluida ou cancelada"
+        numeric total
+    }
+    contas_receber {
+        uuid id PK
+        uuid venda_id FK
+        uuid cliente_id FK
+        numeric valor
+        numeric valor_pago
+        string status
+    }
+```
+
 ## Segurança
 
 Ponto que tratei com atenção especial, por ser um sistema com dados de clientes e movimento financeiro:
 
-- **Autenticação JWT** obrigatória em toda a API (só `/api/auth/login` é público)
+- **Autenticação JWT** obrigatória em toda a API (públicas: login, renovação de sessão, logout e a documentação)
+- **Access token de 15 minutos + refresh token de 7 dias com rotação**: cada renovação troca o par inteiro e invalida o anterior. Se um refresh token já usado for reapresentado (sinal de roubo), a sessão inteira é revogada. No banco fica só o hash SHA-256 do token, nunca o valor
+- **Algoritmo do JWT fixado em HS256**, o que impede ataques de troca de algoritmo (`alg: none`)
+- **Perfis de acesso**: `admin` tem acesso total; `operador` não exclui registros nem cancela vendas (403). O perfil vem do token assinado, não do corpo da requisição
 - **bcrypt** para hash de senha, com resposta idêntica para "usuário não existe" e "senha errada" (evita enumeração de e-mails)
 - **Validação de campos com regras reais, não só formato**: CPF e CNPJ passam pelo algoritmo de dígito verificador (módulo 11) — rejeita números como `111.111.111-11`, que têm o formato certo mas não existem; e-mail, CEP, telefone e UF (as 27 siglas) também validados antes de qualquer escrita no banco
-- **Rate limiting**: geral na API e mais restrito no login, contra força bruta
+- **Rate limiting**: geral na API, mais restrito no login (contra força bruta) e com limite próprio na renovação de sessão
 - **Helmet** (headers HTTP de segurança) e **CORS** restrito à origem do frontend em produção
 - Mensagens de erro genéricas em produção — detalhes internos (SQL, stack trace) nunca chegam ao cliente
 - Conexão com PostgreSQL via SSL em produção (Supabase)
@@ -82,9 +186,26 @@ Nem tudo funcionou de primeira. Documentar isso é mais honesto (e mais interess
 - **Banco:** PostgreSQL — 8 tabelas, UUIDs, triggers automáticos (baixa de estoque, `atualizado_em`)
 - **Deploy:** Vercel (frontend) + Render (backend) + Supabase (PostgreSQL)
 
+## Início rápido com Docker
+
+Sobe PostgreSQL, API e frontend com um comando, sem instalar Node nem PostgreSQL:
+
+```bash
+cp .env.example .env      # preencha JWT_SECRET (openssl rand -hex 48) e ADMIN_SENHA
+docker compose up --build
+```
+
+| Serviço | Endereço |
+|---|---|
+| Frontend | http://localhost:8080 |
+| API | http://localhost:3001 |
+| Documentação interativa | http://localhost:3001/api/docs |
+
+A API aplica as migrações e cria o administrador inicial (dados do `.env`) na subida. O nginx do frontend encaminha `/api` para o backend, então o navegador usa um único endereço e não há CORS a configurar. O CI sobe esta mesma stack a cada push e testa login, dashboard e documentação.
+
 ## Pré-requisitos
 
-- Node.js 18+
+- Node.js 22+
 - PostgreSQL 14+
 
 ## Instalação
@@ -135,11 +256,12 @@ DATABASE_URL=postgresql://usuario:senha@localhost:5432/syre
 NODE_ENV=development
 FRONTEND_URL=http://localhost:5173
 JWT_SECRET=gere-um-valor-aleatorio-forte
+# DATABASE_SSL=false   # em produção a conexão usa SSL; desligue só para um Postgres local sem SSL
 ```
 
 ## Autenticação
 
-A API exige login (JWT) em todas as rotas `/api/*`, exceto `/api/auth/login`.
+A API exige login em todas as rotas `/api/*`, exceto `/api/auth/login`, `/api/auth/refresh`, `/api/auth/logout` e a documentação. O login devolve um access token (15 minutos) e um refresh token (7 dias, uso único). O frontend renova a sessão sozinho quando o token vence.
 
 Crie o usuário inicial rodando (após aplicar as migrações):
 
@@ -150,6 +272,22 @@ ADMIN_NOME="Seu Nome" ADMIN_EMAIL="voce@exemplo.com" ADMIN_SENHA='senha-forte' n
 
 > Se a senha tiver `#`, `$` ou espaços, use aspas simples como no exemplo acima —
 > sem aspas, o dotenv corta a variável no primeiro `#` ao ler o `.env`.
+
+O usuário criado por esse comando é `admin`. Novos usuários entram como `operador` por padrão.
+
+### Atualizando uma instalação que já existe
+
+A migração `003_refresh_tokens_perfis.sql` adiciona o perfil e a tabela de sessões. Rode as migrações **antes** de publicar a versão nova da API, senão o login falha por falta da coluna `perfil`:
+
+```bash
+DATABASE_URL="<sua-connection-string>" NODE_ENV=production npm run migrate
+```
+
+Os usuários que já existiam viram `admin` (eram os únicos que podiam operar o sistema), e isso acontece uma única vez, mesmo que a migração seja executada de novo. Quem estava logado com o token antigo precisa entrar novamente.
+
+## Documentação da API
+
+A documentação é um arquivo OpenAPI 3 ([`backend/openapi.yaml`](backend/openapi.yaml)) servido com Swagger UI em `/api/docs` (spec em JSON em `/api/openapi.json`). Um teste automatizado compara as rotas registradas no Express com as do arquivo e falha se houver rota sem documentação ou documentada sem existir, então ela não fica desatualizada.
 
 ## Deploy em produção
 
@@ -201,11 +339,20 @@ Frontend, backend e banco em provedores separados — de propósito, para deixar
 
 ## Testes e integração contínua
 
-248 testes no total. Os 231 do backend (unitários e de integração, Vitest + Supertest) rodam contra um PostgreSQL real — verificam triggers, transações e restrições do banco, não apenas as rotas. Os 17 do frontend (Vitest + React Testing Library) cobrem login, proteção de rotas e o tratamento de erro da API — simulando digitação e clique reais, não só chamando funções isoladas.
+280 testes no total. Os 255 do backend (unitários e de integração, Vitest + Supertest) rodam contra um PostgreSQL real — verificam triggers, transações e restrições do banco, não apenas as rotas. Os 25 do frontend (Vitest + React Testing Library) cobrem login, proteção de rotas, renovação automática de sessão e o tratamento de erro da API — simulando digitação e clique reais, não só chamando funções isoladas.
+
+| Cobertura do backend (out/2026) | Medido | Mínimo exigido no CI |
+|---|---|---|
+| Linhas e instruções | 95,6% | 92% |
+| Branches | 89,0% | 85% |
+| Funções | 100% | 95% |
+
+Se a cobertura cair abaixo do mínimo, o CI falha.
 
 Cobertura funcional principal (backend):
 
-- autenticação, expiração e adulteração de token, rate limit do login e exigência de token em todas as rotas
+- autenticação, expiração e adulteração de token, rotação do refresh token (incluindo detecção de reuso e renovações simultâneas), perfis de acesso, rate limit do login e exigência de token em todas as rotas
+- contrato da API: o spec OpenAPI é validado e comparado com as rotas reais
 - vendas: cálculo no servidor, estoque insuficiente, atomicidade da transação e cancelamento com devolução de estoque
 - contas a receber: recebimento parcial e total, limite de saldo e marcação de vencidas
 - erros do banco convertidos em respostas 4xx com mensagens fixas, sem vazar detalhes internos
@@ -222,48 +369,38 @@ cd frontend
 npm test
 ```
 
-O workflow em `.github/workflows/ci.yml` executa verificação de tipos, testes com cobertura e build do backend, além de testes e build do frontend, a cada push e pull request. A variável `TEST_DATABASE_URL` permite apontar para outro banco de testes.
+O workflow em `.github/workflows/ci.yml` roda a cada push e pull request, em três jobs:
 
-## Scripts
+1. **Backend**: auditoria das dependências de produção, verificação de tipos, testes com cobertura (com o piso acima) e build.
+2. **Frontend**: testes, verificação de tipos e build.
+3. **Docker**: sobe o `docker-compose.yml` inteiro e faz um teste de fumaça (saúde da API, página do frontend, login pelo proxy do nginx, dashboard autenticado e Swagger UI).
 
-### Backend
-| Comando | Descrição |
-|---|---|
-| `npm run dev` | Inicia em modo desenvolvimento |
-| `npm run build` | Compila TypeScript |
-| `npm start` | Inicia build de produção |
-| `npm test` | Roda os testes (exige o banco `syre_test`) |
-| `npm run test:coverage` | Testes com relatório de cobertura |
-| `npm run typecheck` | Verifica tipos do código e dos testes |
-| `npm run migrate` | Aplica migrações SQL |
-| `npm run create-admin` | Cria/atualiza o usuário administrador |
-
-### Frontend
-| Comando | Descrição |
-|---|---|
-| `npm run dev` | Inicia Vite dev server |
-| `npm run build` | Build de produção |
-| `npm run preview` | Preview do build |
+A variável `TEST_DATABASE_URL` permite apontar para outro banco de testes.
 
 ## API — Endpoints principais
 
 ```
 POST   /api/auth/login
+POST   /api/auth/refresh
+POST   /api/auth/logout
 GET    /api/auth/me
 
 GET    /api/dashboard
 
 GET    /api/clientes
+GET    /api/clientes/:id
 POST   /api/clientes
 PUT    /api/clientes/:id
 DELETE /api/clientes/:id
 
 GET    /api/fornecedores
+GET    /api/fornecedores/:id
 POST   /api/fornecedores
 PUT    /api/fornecedores/:id
 DELETE /api/fornecedores/:id
 
 GET    /api/produtos
+GET    /api/produtos/:id
 POST   /api/produtos
 PUT    /api/produtos/:id
 DELETE /api/produtos/:id
@@ -276,12 +413,13 @@ GET    /api/vendas/:id
 PATCH  /api/vendas/:id/status
 
 GET    /api/contas-receber
+GET    /api/contas-receber/:id
 POST   /api/contas-receber
 PATCH  /api/contas-receber/:id/receber
 POST   /api/contas-receber/marcar-vencidas
 ```
 
-(todas exigem `Authorization: Bearer <token>`, exceto `/api/auth/login`)
+(todas exigem `Authorization: Bearer <token>`, exceto login, refresh e logout. Excluir clientes, fornecedores e produtos e cancelar vendas exige o perfil `admin`. Contrato completo e testável em `/api/docs`.)
 
 ## Autor
 

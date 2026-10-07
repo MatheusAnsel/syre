@@ -18,7 +18,9 @@ export default defineConfig({
       provider: 'v8',
       include: ['src/**/*.ts'],
       exclude: ['src/index.ts', 'src/db/migrate.ts', 'src/db/createAdmin.ts', 'src/types/**'],
-      reporter: ['text', 'lcov'],
+      reporter: ['text', 'text-summary', 'lcov'],
+      // Piso exigido no CI: a build falha se a cobertura cair abaixo disto.
+      thresholds: { lines: 92, statements: 92, functions: 95, branches: 85 },
     },
   },
 });

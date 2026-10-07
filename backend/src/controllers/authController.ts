@@ -1,7 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import pool from '../db/pool';
+import {
+  ACCESS_TOKEN_TTL_SEGUNDOS,
+  Perfil,
+  emitirRefreshToken,
+  encerrarSessao,
+  gerarAccessToken,
+  renovarSessao,
+} from '../services/tokenService';
 
 export async function login(req: Request, res: Response, next: NextFunction) {
   try {
@@ -28,19 +35,56 @@ export async function login(req: Request, res: Response, next: NextFunction) {
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      throw new Error('JWT_SECRET não configurado no servidor');
-    }
-
-    const token = jwt.sign({ sub: usuario.id, email: usuario.email }, secret, {
-      expiresIn: '12h',
-    });
+    const token = gerarAccessToken({ id: usuario.id, email: usuario.email, perfil: usuario.perfil as Perfil });
+    const refresh = await emitirRefreshToken(pool, usuario.id);
 
     res.json({
       token,
-      usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email },
+      refreshToken: refresh.token,
+      expiresIn: ACCESS_TOKEN_TTL_SEGUNDOS,
+      usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email, perfil: usuario.perfil },
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function refresh(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { refreshToken } = req.body ?? {};
+    if (!refreshToken || typeof refreshToken !== 'string') {
+      return res.status(400).json({ error: 'Informe o refreshToken' });
+    }
+
+    const resultado = await renovarSessao(refreshToken);
+    if (!resultado.ok) {
+      // Mesma resposta para qualquer motivo: não ajuda quem estiver testando tokens.
+      return res.status(401).json({ error: 'Sessão inválida ou expirada' });
+    }
+
+    res.json({
+      token: resultado.accessToken,
+      refreshToken: resultado.refreshToken,
+      expiresIn: ACCESS_TOKEN_TTL_SEGUNDOS,
+      usuario: {
+        id: resultado.usuario.id,
+        nome: resultado.usuario.nome,
+        email: resultado.usuario.email,
+        perfil: resultado.usuario.perfil,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function logout(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { refreshToken } = req.body ?? {};
+    if (typeof refreshToken === 'string' && refreshToken) {
+      await encerrarSessao(refreshToken);
+    }
+    res.status(204).end();
   } catch (err) {
     next(err);
   }
@@ -50,7 +94,7 @@ export async function me(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = (req as any).userId;
     const { rows } = await pool.query(
-      'SELECT id, nome, email FROM usuarios WHERE id=$1',
+      'SELECT id, nome, email, perfil FROM usuarios WHERE id=$1',
       [userId]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Usuário não encontrado' });

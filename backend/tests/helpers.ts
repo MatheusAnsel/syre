@@ -9,7 +9,7 @@ export const api = () => request(app);
 export async function resetDb(): Promise<void> {
   await pool.query(
     `TRUNCATE TABLE contas_receber, itens_venda, movimentacoes_estoque, vendas,
-       produtos, fornecedores, clientes, usuarios RESTART IDENTITY CASCADE`
+       produtos, fornecedores, clientes, usuarios, refresh_tokens RESTART IDENTITY CASCADE`
   );
 }
 
@@ -29,6 +29,7 @@ export interface UsuarioTeste {
   nome: string;
   email: string;
   senha: string;
+  perfil: 'admin' | 'operador';
 }
 
 export async function criarUsuario(
@@ -38,28 +39,29 @@ export async function criarUsuario(
     nome: 'Usuário de Teste',
     email: 'teste@syre.dev',
     senha: 'senha-forte-123',
+    perfil: 'admin' as const, // os testes de CRUD precisam de acesso total; perfis são testados em perfis.test.ts
     ativo: true,
     ...overrides,
   };
   const senhaHash = await bcrypt.hash(dados.senha, 4); // custo baixo só para acelerar os testes
   const [row] = await query(
-    'INSERT INTO usuarios (nome, email, senha_hash, ativo) VALUES ($1,$2,$3,$4) RETURNING id',
-    [dados.nome, dados.email, senhaHash, dados.ativo]
+    'INSERT INTO usuarios (nome, email, senha_hash, ativo, perfil) VALUES ($1,$2,$3,$4,$5) RETURNING id',
+    [dados.nome, dados.email, senhaHash, dados.ativo, dados.perfil]
   );
-  return { id: row.id, nome: dados.nome, email: dados.email, senha: dados.senha };
+  return { id: row.id, nome: dados.nome, email: dados.email, senha: dados.senha, perfil: dados.perfil };
 }
 
 export function gerarToken(
-  usuario: { id: string; email: string },
+  usuario: { id: string; email: string; perfil?: 'admin' | 'operador' },
   opcoes: jwt.SignOptions = { expiresIn: '1h' },
   segredo: string = process.env.JWT_SECRET as string
 ): string {
-  return jwt.sign({ sub: usuario.id, email: usuario.email }, segredo, opcoes);
+  return jwt.sign({ sub: usuario.id, email: usuario.email, perfil: usuario.perfil ?? 'admin' }, segredo, opcoes);
 }
 
 /** Cria um usuário e devolve o header Authorization pronto para usar nas requisições. */
-export async function autenticar() {
-  const usuario = await criarUsuario();
+export async function autenticar(overrides: Partial<UsuarioTeste> = {}) {
+  const usuario = await criarUsuario(overrides);
   return { usuario, auth: `Bearer ${gerarToken(usuario)}` };
 }
 

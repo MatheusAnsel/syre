@@ -5,6 +5,7 @@ const BASE = import.meta.env.VITE_API_URL
   : '/api';
 
 const TOKEN_KEY = 'syre_token';
+const REFRESH_KEY = 'syre_refresh';
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
@@ -14,11 +15,63 @@ export function setToken(token: string) {
   localStorage.setItem(TOKEN_KEY, token);
 }
 
-export function clearToken() {
-  localStorage.removeItem(TOKEN_KEY);
+export function getRefreshToken() {
+  return localStorage.getItem(REFRESH_KEY);
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+export function setRefreshToken(token: string) {
+  localStorage.setItem(REFRESH_KEY, token);
+}
+
+/** Remove a sessão inteira (access e refresh token) do navegador. */
+export function clearToken() {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(REFRESH_KEY);
+}
+
+// Várias requisições podem receber 401 ao mesmo tempo (ex.: o dashboard carrega vários painéis).
+// Todas esperam a mesma renovação: o refresh token é de uso único, então renovar em paralelo
+// faria o servidor tratar a segunda chamada como reuso e derrubar a sessão.
+let renovacaoEmAndamento: Promise<boolean> | null = null;
+
+function renovarSessao(): Promise<boolean> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return Promise.resolve(false);
+
+  if (!renovacaoEmAndamento) {
+    renovacaoEmAndamento = (async () => {
+      try {
+        const res = await fetch(`${BASE}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        });
+        if (!res.ok) return false;
+        const data = await res.json();
+        setToken(data.token);
+        setRefreshToken(data.refreshToken);
+        return true;
+      } catch {
+        return false;
+      }
+    })().finally(() => {
+      renovacaoEmAndamento = null;
+    });
+  }
+  return renovacaoEmAndamento;
+}
+
+/** Avisa o servidor para revogar a sessão. keepalive permite que a chamada termine mesmo com o redirecionamento logo em seguida. */
+export function encerrarSessaoNoServidor(refreshToken: string) {
+  void fetch(`${BASE}/auth/logout`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refreshToken }),
+    keepalive: true,
+  }).catch(() => undefined);
+}
+
+async function request<T>(path: string, options?: RequestInit, jaTentouRenovar = false): Promise<T> {
   const token = getToken();
   const res = await fetch(`${BASE}${path}`, {
     headers: {
@@ -29,6 +82,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
   });
   if (res.status === 401 && !path.startsWith('/auth/')) {
+    // Access token vencido: tenta renovar a sessão uma vez e repete a chamada original.
+    if (!jaTentouRenovar && (await renovarSessao())) {
+      return request<T>(path, options, true);
+    }
     clearToken();
     if (!window.location.pathname.startsWith('/login')) {
       window.location.href = '/login';

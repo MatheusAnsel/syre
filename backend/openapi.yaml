@@ -1,0 +1,870 @@
+openapi: 3.0.3
+info:
+  title: Syre API
+  version: 1.0.0
+  description: |
+    API REST do Syre, sistema de controle financeiro e de estoque (clientes, fornecedores, produtos,
+    vendas e contas a receber).
+
+    **Autenticação.** O login devolve um access token JWT (15 minutos) e um refresh token (7 dias, uso único).
+    Envie o access token no cabeçalho `Authorization: Bearer <token>`. Quando ele vencer, troque o refresh token
+    em `POST /api/auth/refresh`: a cada renovação o par inteiro é substituído, e reapresentar um refresh token
+    já usado revoga a sessão inteira.
+
+    **Perfis.** `admin` tem acesso total. `operador` não pode excluir registros nem cancelar vendas (403).
+servers:
+  - url: http://localhost:3001
+    description: Desenvolvimento local
+tags:
+  - name: Sistema
+  - name: Autenticação
+  - name: Dashboard
+  - name: Clientes
+  - name: Fornecedores
+  - name: Produtos
+  - name: Vendas
+  - name: Contas a receber
+
+paths:
+  /health:
+    get:
+      tags: [Sistema]
+      summary: Verifica se a API está no ar
+      responses:
+        '200':
+          description: API operacional
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  service: { type: string, example: Syre API }
+
+  /api/auth/login:
+    post:
+      tags: [Autenticação]
+      summary: Autentica o usuário
+      description: Limitado a 10 tentativas por 15 minutos por IP. A resposta é a mesma para email inexistente e senha errada.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, senha]
+              properties:
+                email: { type: string, format: email }
+                senha: { type: string, format: password }
+      responses:
+        '200':
+          description: Sessão criada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sessao' }
+        '400': { $ref: '#/components/responses/Invalido' }
+        '401':
+          description: Credenciais inválidas
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Erro' }
+        '429': { $ref: '#/components/responses/LimiteExcedido' }
+
+  /api/auth/refresh:
+    post:
+      tags: [Autenticação]
+      summary: Renova a sessão (rotação de refresh token)
+      description: |
+        Troca o refresh token por um par novo. O token apresentado é invalidado.
+        Se um token já usado for reapresentado, todos os tokens da sessão são revogados.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        '200':
+          description: Par de tokens novo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sessao' }
+        '400': { $ref: '#/components/responses/Invalido' }
+        '401':
+          description: Refresh token desconhecido, expirado, revogado ou de usuário inativo (resposta única para todos os casos)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Erro' }
+        '429': { $ref: '#/components/responses/LimiteExcedido' }
+
+  /api/auth/logout:
+    post:
+      tags: [Autenticação]
+      summary: Encerra a sessão
+      description: Revoga a sessão do refresh token informado. Idempotente.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken: { type: string }
+      responses:
+        '204': { description: Sessão encerrada }
+
+  /api/auth/me:
+    get:
+      tags: [Autenticação]
+      summary: Dados do usuário autenticado
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Usuário
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Usuario' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /api/dashboard:
+    get:
+      tags: [Dashboard]
+      summary: Indicadores do painel
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Indicadores do mês, contas em aberto, estoque baixo, vendas dos últimos 6 meses e top produtos
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Dashboard' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+
+  /api/clientes:
+    get:
+      tags: [Clientes]
+      summary: Lista clientes
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: search, in: query, schema: { type: string }, description: "Busca por nome, CPF/CNPJ ou email" }
+        - { name: ativo, in: query, schema: { type: boolean, default: true }, description: Por padrão lista somente clientes ativos; envie false para ver os inativos }
+      responses:
+        '200':
+          description: Lista de clientes
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Cliente' } }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+    post:
+      tags: [Clientes]
+      summary: Cria cliente
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClienteEntrada' }
+      responses:
+        '201':
+          description: Cliente criado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cliente' }
+        '400': { $ref: '#/components/responses/Invalido' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '409': { $ref: '#/components/responses/Conflito' }
+
+  /api/clientes/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    get:
+      tags: [Clientes]
+      summary: Busca cliente
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Cliente
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cliente' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+    put:
+      tags: [Clientes]
+      summary: Atualiza cliente
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClienteEntrada' }
+      responses:
+        '200':
+          description: Cliente atualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cliente' }
+        '400': { $ref: '#/components/responses/Invalido' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflito' }
+    delete:
+      tags: [Clientes]
+      summary: Desativa cliente (exclusão lógica)
+      description: Restrito ao perfil `admin`.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: Cliente desativado }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/SemPermissao' }
+
+  /api/fornecedores:
+    get:
+      tags: [Fornecedores]
+      summary: Lista fornecedores
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: search, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Lista de fornecedores
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Fornecedor' } }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+    post:
+      tags: [Fornecedores]
+      summary: Cria fornecedor
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FornecedorEntrada' }
+      responses:
+        '201':
+          description: Fornecedor criado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Fornecedor' }
+        '400': { $ref: '#/components/responses/Invalido' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '409': { $ref: '#/components/responses/Conflito' }
+
+  /api/fornecedores/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    get:
+      tags: [Fornecedores]
+      summary: Busca fornecedor
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Fornecedor
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Fornecedor' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+    put:
+      tags: [Fornecedores]
+      summary: Atualiza fornecedor
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FornecedorEntrada' }
+      responses:
+        '200':
+          description: Fornecedor atualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Fornecedor' }
+        '400': { $ref: '#/components/responses/Invalido' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflito' }
+    delete:
+      tags: [Fornecedores]
+      summary: Desativa fornecedor (exclusão lógica)
+      description: Restrito ao perfil `admin`.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: Fornecedor desativado }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/SemPermissao' }
+
+  /api/produtos:
+    get:
+      tags: [Produtos]
+      summary: Lista produtos
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: search, in: query, schema: { type: string }, description: Busca por nome ou código }
+        - { name: categoria, in: query, schema: { type: string } }
+        - { name: baixo_estoque, in: query, schema: { type: boolean }, description: Somente produtos com estoque atual menor ou igual ao mínimo }
+      responses:
+        '200':
+          description: Lista de produtos
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Produto' } }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+    post:
+      tags: [Produtos]
+      summary: Cria produto
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProdutoEntrada' }
+      responses:
+        '201':
+          description: Produto criado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Produto' }
+        '400': { $ref: '#/components/responses/Invalido' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '409': { $ref: '#/components/responses/Conflito' }
+
+  /api/produtos/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    get:
+      tags: [Produtos]
+      summary: Busca produto
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Produto
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Produto' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+    put:
+      tags: [Produtos]
+      summary: Atualiza produto
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProdutoEntrada' }
+      responses:
+        '200':
+          description: Produto atualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Produto' }
+        '400': { $ref: '#/components/responses/Invalido' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflito' }
+    delete:
+      tags: [Produtos]
+      summary: Remove produto
+      description: Restrito ao perfil `admin`.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: Produto removido }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/SemPermissao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /api/produtos/{id}/estoque:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    post:
+      tags: [Produtos]
+      summary: Ajusta o estoque (entrada ou saída)
+      description: Registra uma movimentação. Saídas maiores que o estoque atual são recusadas.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tipo, quantidade]
+              properties:
+                tipo: { type: string, enum: [entrada, saida] }
+                quantidade: { type: number, exclusiveMinimum: true, minimum: 0 }
+                motivo: { type: string, maxLength: 200 }
+      responses:
+        '200':
+          description: Produto com o estoque atualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Produto' }
+        '400': { $ref: '#/components/responses/Invalido' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409':
+          description: Estoque insuficiente para a saída
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Erro' }
+
+  /api/produtos/{id}/movimentacoes:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    get:
+      tags: [Produtos]
+      summary: Últimas 50 movimentações de estoque do produto
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Movimentações, da mais recente para a mais antiga
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Movimentacao' } }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+
+  /api/vendas:
+    get:
+      tags: [Vendas]
+      summary: Lista vendas
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/StatusVenda' } }
+        - { name: cliente_id, in: query, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Lista de vendas
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Venda' } }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+    post:
+      tags: [Vendas]
+      summary: Registra venda
+      description: |
+        Em uma única transação: valida os itens, baixa o estoque, grava a venda e gera a conta a receber
+        (vencimento em 30 dias). Se qualquer etapa falhar, nada é gravado.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VendaEntrada' }
+      responses:
+        '201':
+          description: Venda criada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Venda' }
+        '400': { $ref: '#/components/responses/Invalido' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '409':
+          description: Estoque insuficiente para algum item
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Erro' }
+
+  /api/vendas/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    get:
+      tags: [Vendas]
+      summary: Busca venda com seus itens
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Venda e itens
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VendaDetalhe' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /api/vendas/{id}/status:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    patch:
+      tags: [Vendas]
+      summary: Altera o status da venda
+      description: |
+        Cancelar estorna o estoque e cancela a conta a receber, e é restrito ao perfil `admin`.
+        Venda cancelada não pode ser reativada, e venda com pagamento já registrado não pode ser cancelada.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: '#/components/schemas/StatusVenda' }
+      responses:
+        '200':
+          description: Venda atualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Venda' }
+        '400': { $ref: '#/components/responses/Invalido' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/SemPermissao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflito' }
+
+  /api/contas-receber:
+    get:
+      tags: [Contas a receber]
+      summary: Lista contas a receber
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/StatusConta' } }
+        - { name: cliente_id, in: query, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Lista de contas
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/ContaReceber' } }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+    post:
+      tags: [Contas a receber]
+      summary: Cria conta a receber avulsa
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [descricao, valor, vencimento]
+              properties:
+                cliente_id: { type: string, format: uuid, nullable: true }
+                descricao: { type: string, maxLength: 300 }
+                valor: { type: number, exclusiveMinimum: true, minimum: 0 }
+                vencimento: { type: string, format: date }
+      responses:
+        '201':
+          description: Conta criada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContaReceber' }
+        '400': { $ref: '#/components/responses/Invalido' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+
+  /api/contas-receber/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    get:
+      tags: [Contas a receber]
+      summary: Busca conta a receber
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Conta
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContaReceber' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /api/contas-receber/{id}/receber:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    patch:
+      tags: [Contas a receber]
+      summary: Registra recebimento (total ou parcial)
+      description: Recusa valor maior que o saldo em aberto, conta já quitada e conta cancelada.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [valor_pago]
+              properties:
+                valor_pago: { type: number, exclusiveMinimum: true, minimum: 0 }
+      responses:
+        '200':
+          description: Conta atualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContaReceber' }
+        '400': { $ref: '#/components/responses/Invalido' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflito' }
+
+  /api/contas-receber/marcar-vencidas:
+    post:
+      tags: [Contas a receber]
+      summary: Marca como vencidas as contas em aberto com vencimento passado
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Quantidade de contas atualizadas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  atualizadas: { type: integer }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    Invalido:
+      description: Dados inválidos
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Erro' }
+    NaoAutenticado:
+      description: Token ausente, inválido ou expirado
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Erro' }
+    SemPermissao:
+      description: O perfil do usuário não permite esta ação
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Erro' }
+    NaoEncontrado:
+      description: Registro não encontrado
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Erro' }
+    Conflito:
+      description: Conflito com o estado atual do registro (duplicidade ou regra de negócio)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Erro' }
+    LimiteExcedido:
+      description: Limite de requisições excedido
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Erro' }
+
+  schemas:
+    Erro:
+      type: object
+      properties:
+        error: { type: string, example: Informe o nome }
+
+    Perfil:
+      type: string
+      enum: [admin, operador]
+
+    Usuario:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        nome: { type: string }
+        email: { type: string, format: email }
+        perfil: { $ref: '#/components/schemas/Perfil' }
+
+    Sessao:
+      type: object
+      properties:
+        token: { type: string, description: "Access token JWT (HS256, 15 minutos)" }
+        refreshToken: { type: string, description: Uso único; válido por 7 dias }
+        expiresIn: { type: integer, example: 900, description: "Validade do access token, em segundos" }
+        usuario: { $ref: '#/components/schemas/Usuario' }
+
+    ClienteEntrada:
+      type: object
+      required: [nome]
+      properties:
+        nome: { type: string, maxLength: 200 }
+        cpf_cnpj: { type: string, nullable: true, description: CPF ou CNPJ com dígitos verificadores válidos }
+        email: { type: string, format: email, nullable: true }
+        telefone: { type: string, nullable: true, description: 10 ou 11 dígitos }
+        endereco: { type: string, maxLength: 500, nullable: true }
+        cidade: { type: string, maxLength: 100, nullable: true }
+        estado: { type: string, minLength: 2, maxLength: 2, nullable: true, description: UF }
+        cep: { type: string, nullable: true, description: 8 dígitos }
+        ativo: { type: boolean, default: true, description: Usado apenas na atualização }
+    Cliente:
+      allOf:
+        - { $ref: '#/components/schemas/ClienteEntrada' }
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            criado_em: { type: string, format: date-time }
+            atualizado_em: { type: string, format: date-time }
+
+    FornecedorEntrada:
+      type: object
+      required: [nome]
+      properties:
+        nome: { type: string, maxLength: 200 }
+        cnpj: { type: string, nullable: true }
+        email: { type: string, format: email, nullable: true }
+        telefone: { type: string, nullable: true }
+        endereco: { type: string, maxLength: 500, nullable: true }
+        cidade: { type: string, maxLength: 100, nullable: true }
+        estado: { type: string, minLength: 2, maxLength: 2, nullable: true }
+        cep: { type: string, nullable: true }
+        ativo: { type: boolean, default: true }
+    Fornecedor:
+      allOf:
+        - { $ref: '#/components/schemas/FornecedorEntrada' }
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            criado_em: { type: string, format: date-time }
+            atualizado_em: { type: string, format: date-time }
+
+    ProdutoEntrada:
+      type: object
+      required: [nome]
+      properties:
+        nome: { type: string, maxLength: 200 }
+        codigo: { type: string, maxLength: 50, nullable: true, description: Único }
+        descricao: { type: string, nullable: true }
+        categoria: { type: string, maxLength: 100, nullable: true }
+        unidade: { type: string, maxLength: 20, default: UN }
+        preco_custo: { type: number, minimum: 0 }
+        preco_venda: { type: number, minimum: 0 }
+        estoque_atual: { type: number, minimum: 0, description: Aceito apenas na criação; depois use /estoque }
+        estoque_minimo: { type: number, minimum: 0 }
+        fornecedor_id: { type: string, format: uuid, nullable: true }
+        ativo: { type: boolean, default: true, description: Usado apenas na atualização }
+    Produto:
+      allOf:
+        - { $ref: '#/components/schemas/ProdutoEntrada' }
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            criado_em: { type: string, format: date-time }
+            atualizado_em: { type: string, format: date-time }
+
+    Movimentacao:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        produto_id: { type: string, format: uuid }
+        tipo: { type: string, enum: [entrada, saida] }
+        quantidade: { type: number }
+        motivo: { type: string, nullable: true }
+        referencia_id: { type: string, format: uuid, nullable: true, description: "Venda que originou a movimentação, quando houver" }
+        criado_em: { type: string, format: date-time }
+
+    StatusVenda:
+      type: string
+      enum: [pendente, concluida, cancelada]
+
+    ItemVendaEntrada:
+      type: object
+      required: [produto_id, quantidade]
+      properties:
+        produto_id: { type: string, format: uuid }
+        quantidade: { type: number, exclusiveMinimum: true, minimum: 0 }
+        preco_unit: { type: number, minimum: 0, description: "Se omitido, usa o preço de venda atual do produto" }
+        desconto: { type: number, minimum: 0, default: 0 }
+
+    VendaEntrada:
+      type: object
+      required: [itens]
+      properties:
+        cliente_id: { type: string, format: uuid, nullable: true }
+        itens:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/ItemVendaEntrada' }
+        desconto: { type: number, minimum: 0, default: 0, description: Desconto sobre o total dos itens }
+        observacoes: { type: string, nullable: true }
+
+    Venda:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        numero: { type: integer }
+        cliente_id: { type: string, format: uuid, nullable: true }
+        cliente_nome: { type: string, nullable: true, description: Presente nas listagens e na consulta individual }
+        status: { $ref: '#/components/schemas/StatusVenda' }
+        desconto: { type: number }
+        total: { type: number }
+        observacoes: { type: string, nullable: true }
+        criado_em: { type: string, format: date-time }
+        atualizado_em: { type: string, format: date-time }
+
+    ItemVenda:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        venda_id: { type: string, format: uuid }
+        produto_id: { type: string, format: uuid }
+        produto_nome: { type: string }
+        unidade: { type: string }
+        quantidade: { type: number }
+        preco_unit: { type: number }
+        desconto: { type: number }
+        subtotal: { type: number }
+
+    VendaDetalhe:
+      allOf:
+        - { $ref: '#/components/schemas/Venda' }
+        - type: object
+          properties:
+            itens:
+              type: array
+              items: { $ref: '#/components/schemas/ItemVenda' }
+
+    StatusConta:
+      type: string
+      enum: [aberta, recebida, vencida, cancelada]
+
+    ContaReceber:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        venda_id: { type: string, format: uuid, nullable: true }
+        cliente_id: { type: string, format: uuid, nullable: true }
+        cliente_nome: { type: string, nullable: true }
+        descricao: { type: string }
+        valor: { type: number }
+        valor_pago: { type: number }
+        vencimento: { type: string, format: date }
+        status: { $ref: '#/components/schemas/StatusConta' }
+        criado_em: { type: string, format: date-time }
+        atualizado_em: { type: string, format: date-time }
+
+    Dashboard:
+      type: object
+      properties:
+        vendas_mes: { type: integer }
+        receita_mes: { type: number }
+        contas_abertas: { type: integer }
+        valor_a_receber: { type: number }
+        produtos_baixo_estoque: { type: integer }
+        clientes_ativos: { type: integer }
+        vendas_por_mes:
+          type: array
+          items:
+            type: object
+            properties:
+              mes: { type: string, example: Out/26 }
+              total: { type: string, description: Valor decimal em texto (retorno NUMERIC do PostgreSQL) }
+        top_produtos:
+          type: array
+          items:
+            type: object
+            properties:
+              nome: { type: string }
+              quantidade: { type: string, description: Valor decimal em texto }

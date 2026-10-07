@@ -2,6 +2,8 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import swaggerUi from 'swagger-ui-express';
+import { openApiSpec } from './docs/openapi';
 import rateLimit from 'express-rate-limit';
 import routes from './routes';
 import { login, logout, me, refresh } from './controllers/authController';
@@ -10,7 +12,7 @@ import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
 
-app.set('trust proxy', 1); // necessário atrás do proxy da plataforma de deploy (Render, Railway etc.) p/ rate-limit funcionar
+app.set('trust proxy', 1); // necessário atrás do proxy da plataforma de deploy (Render etc.) p/ rate-limit funcionar
 
 app.use(helmet());
 app.use(
@@ -50,6 +52,14 @@ const refreshLimiter = rateLimit({
 });
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'Syre API' }));
+
+// Documentação pública da API (o spec não contém segredos). Fica antes do requireAuth.
+app.get('/api/openapi.json', (_req, res) => res.json(openApiSpec));
+app.use(
+  '/api/docs',
+  swaggerUi.serve,
+  swaggerUi.setup(openApiSpec, { customSiteTitle: 'Syre API - Documentação' })
+);
 
 app.post('/api/auth/login', loginLimiter, login);
 app.post('/api/auth/refresh', refreshLimiter, refresh);

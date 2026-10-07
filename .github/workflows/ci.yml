@@ -57,8 +57,21 @@ jobs:
       - name: Verificar tipos (código e testes)
         run: npm run typecheck
 
-      - name: Rodar testes com cobertura
-        run: npm run test:coverage
+      - name: Auditar dependências de produção
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Rodar testes com cobertura (falha abaixo do piso configurado)
+        run: npm run test:coverage | tee coverage.txt
+
+      - name: Resumo de cobertura no painel da execução
+        if: always()
+        run: |
+          {
+            echo "### Cobertura do backend"
+            echo '```'
+            sed -n '/Coverage summary/,/^=*$/p' coverage.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Compilar
         run: npm run build
@@ -99,3 +112,47 @@ jobs:
 
       - name: Verificar tipos e compilar
         run: npm run build
+
+  docker:
+    name: Docker (sobe o compose e testa)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [backend, frontend]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Criar .env de teste
+        run: |
+          {
+            echo "JWT_SECRET=$(openssl rand -hex 48)"
+            echo "ADMIN_NOME=CI"
+            echo "ADMIN_EMAIL=ci@exemplo.com"
+            echo "ADMIN_SENHA=senha-do-ci-123"
+          } > .env
+
+      - name: Subir a stack e esperar os healthchecks
+        run: docker compose up -d --build --wait --wait-timeout 180
+
+      - name: Teste de fumaça (API, proxy do nginx, login e documentação)
+        run: |
+          set -e
+          curl -fsS http://localhost:3001/health
+          curl -fsS http://localhost:8080/ | grep -q 'id="root"'
+          # login passando pelo nginx (valida o proxy /api -> backend)
+          resposta=$(curl -fsS -X POST http://localhost:8080/api/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"ci@exemplo.com","senha":"senha-do-ci-123"}')
+          echo "$resposta" | grep -q '"perfil":"admin"'
+          token=$(echo "$resposta" | sed -E 's/.*"token":"([^"]+)".*/\1/')
+          curl -fsS -H "Authorization: Bearer $token" http://localhost:8080/api/dashboard >/dev/null
+          curl -fsS http://localhost:3001/api/docs/ | grep -qi swagger
+
+      - name: Logs em caso de falha
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Derrubar a stack
+        if: always()
+        run: docker compose down -v

@@ -1,0 +1,45 @@
+# Sobe o Syre inteiro (PostgreSQL + API + frontend) com um comando:
+#   cp .env.example .env   # e preencha JWT_SECRET e os dados do administrador
+#   docker compose up --build
+# Frontend: http://localhost:8080    API: http://localhost:3001    Docs: http://localhost:3001/api/docs
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: syre
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-syre_dev}
+      POSTGRES_DB: syre
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U syre -d syre"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://syre:${POSTGRES_PASSWORD:-syre_dev}@db:5432/syre
+      DATABASE_SSL: "false"
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET no arquivo .env (veja .env.example)}
+      FRONTEND_URL: http://localhost:8080
+      ADMIN_NOME: ${ADMIN_NOME:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_SENHA: ${ADMIN_SENHA:-}
+    ports:
+      - "3001:3001"
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:

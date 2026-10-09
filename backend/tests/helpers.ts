@@ -29,7 +29,7 @@ export interface UsuarioTeste {
   nome: string;
   email: string;
   senha: string;
-  perfil: 'admin' | 'operador';
+  perfil: 'admin' | 'operador' | 'demo';
 }
 
 export async function criarUsuario(
@@ -52,7 +52,7 @@ export async function criarUsuario(
 }
 
 export function gerarToken(
-  usuario: { id: string; email: string; perfil?: 'admin' | 'operador' },
+  usuario: { id: string; email: string; perfil?: 'admin' | 'operador' | 'demo' },
   opcoes: jwt.SignOptions = { expiresIn: '1h' },
   segredo: string = process.env.JWT_SECRET as string
 ): string {

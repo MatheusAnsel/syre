@@ -11,7 +11,7 @@ info:
     em `POST /api/auth/refresh`: a cada renovação o par inteiro é substituído, e reapresentar um refresh token
     já usado revoga a sessão inteira.
 
-    **Perfis.** `admin` tem acesso total. `operador` não pode excluir registros nem cancelar vendas (403).
+    **Perfis.** `admin` tem acesso total. `operador` não pode excluir registros nem cancelar vendas (403). `demo` é a conta de demonstração para recrutadores: só consulta, qualquer escrita retorna 403.
 servers:
   - url: http://localhost:3001
     description: Desenvolvimento local
@@ -668,7 +668,7 @@ components:
 
     Perfil:
       type: string
-      enum: [admin, operador]
+      enum: [admin, operador, demo]
 
     Usuario:
       type: object

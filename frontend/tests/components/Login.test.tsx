@@ -80,4 +80,39 @@ describe('Login', () => {
 
     resolver({ ok: true, status: 200, json: async () => ({ token: 't', usuario: { id: '1', nome: 'T', email: 'e' } }) });
   });
+
+  it('o botão de acesso demo preenche e-mail e senha com um clique, sem enviar o formulário', async () => {
+    global.fetch = vi.fn() as unknown as typeof fetch;
+
+    renderLogin();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /preencher com acesso demo/i }));
+
+    expect(screen.getByPlaceholderText('voce@exemplo.com')).toHaveValue('recrutador@syre.dev');
+    expect(screen.getByPlaceholderText('••••••••')).toHaveValue('demo-syre-2026');
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('depois de preencher com o demo, o login entra normalmente', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        token: 't',
+        refreshToken: 'r',
+        usuario: { id: '1', nome: 'Recrutador (demo)', email: 'recrutador@syre.dev', perfil: 'demo' },
+      }),
+    }) as unknown as typeof fetch;
+
+    renderLogin();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /preencher com acesso demo/i }));
+    await user.click(screen.getByRole('button', { name: /^entrar$/i }));
+
+    await waitFor(() => expect(screen.getByText('Página inicial')).toBeInTheDocument());
+    const [, init] = (global.fetch as any).mock.calls[0];
+    expect(JSON.parse(init.body)).toEqual({ email: 'recrutador@syre.dev', senha: 'demo-syre-2026' });
+  });
 });

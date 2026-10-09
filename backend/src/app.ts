@@ -8,6 +8,7 @@ import rateLimit from 'express-rate-limit';
 import routes from './routes';
 import { login, logout, me, refresh } from './controllers/authController';
 import { requireAuth } from './middleware/requireAuth';
+import { bloquearEscritaDemo } from './middleware/requirePerfil';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -66,7 +67,7 @@ app.post('/api/auth/refresh', refreshLimiter, refresh);
 app.post('/api/auth/logout', logout);
 app.get('/api/auth/me', requireAuth, me);
 
-app.use('/api', requireAuth, routes);
+app.use('/api', requireAuth, bloquearEscritaDemo, routes);
 
 app.use(errorHandler);
 

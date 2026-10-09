@@ -10,4 +10,10 @@ if [ -n "$ADMIN_NOME" ] && [ -n "$ADMIN_EMAIL" ] && [ -n "$ADMIN_SENHA" ]; then
   node dist/db/createAdmin.js
 fi
 
+# Conta de demonstração (somente leitura) para recrutadores: só é criada se DEMO_SENHA estiver definida.
+if [ -n "$DEMO_SENHA" ]; then
+  echo "Garantindo a conta de demonstração..."
+  node dist/db/createDemo.js
+fi
+
 exec node dist/index.js

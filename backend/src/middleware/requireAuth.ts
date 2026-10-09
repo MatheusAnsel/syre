@@ -23,8 +23,10 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     };
     (req as any).userId = payload.sub;
     (req as any).userEmail = payload.email;
-    // Tokens sem perfil (emitidos antes dos perfis existirem) caem no menor privilégio.
-    (req as any).userPerfil = payload.perfil === 'admin' ? 'admin' : 'operador';
+    // Tokens sem perfil (emitidos antes dos perfis existirem) caem em 'operador'.
+    // Qualquer valor desconhecido também: só 'admin' e 'demo' são reconhecidos explicitamente.
+    (req as any).userPerfil =
+      payload.perfil === 'admin' || payload.perfil === 'demo' ? payload.perfil : 'operador';
     next();
   } catch {
     return res.status(401).json({ error: 'Sessão inválida ou expirada' });

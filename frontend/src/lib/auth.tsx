@@ -6,12 +6,13 @@ interface Usuario {
   id: string;
   nome: string;
   email: string;
-  perfil: 'admin' | 'operador';
+  perfil: 'admin' | 'operador' | 'demo';
 }
 
 interface AuthContextValue {
   usuario: Usuario | null;
   isAdmin: boolean;
+  isDemo: boolean;
   carregando: boolean;
   login: (email: string, senha: string) => Promise<void>;
   logout: () => void;
@@ -50,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ usuario, isAdmin: usuario?.perfil === 'admin', carregando, login, logout }}>
+    <AuthContext.Provider value={{ usuario, isAdmin: usuario?.perfil === 'admin', isDemo: usuario?.perfil === 'demo', carregando, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

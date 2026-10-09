@@ -17,3 +17,13 @@ export function exigirAdminParaCancelar(req: Request, res: Response, next: NextF
   if (req.body?.status === 'cancelada') return requirePerfil('admin')(req, res, next);
   next();
 }
+
+const METODOS_DE_LEITURA = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+/** A conta de demonstração (recrutadores) só consulta: qualquer escrita é recusada, em todas as rotas. */
+export function bloquearEscritaDemo(req: Request, res: Response, next: NextFunction) {
+  if ((req as any).userPerfil === 'demo' && !METODOS_DE_LEITURA.has(req.method)) {
+    return res.status(403).json({ error: 'Conta de demonstração: somente leitura' });
+  }
+  next();
+}

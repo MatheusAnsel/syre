@@ -2,6 +2,7 @@ import { useState, FormEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { Button, Card } from '../components/ui';
+import { DEMO_ATIVO, DEMO_EMAIL, DEMO_SENHA } from '../lib/demo';
 
 export default function Login() {
   const { login } = useAuth();
@@ -25,6 +26,12 @@ export default function Login() {
     } finally {
       setCarregando(false);
     }
+  }
+
+  function preencherDemo() {
+    setErro(null);
+    setEmail(DEMO_EMAIL);
+    setSenha(DEMO_SENHA);
   }
 
   return (
@@ -76,6 +83,26 @@ export default function Login() {
             {carregando ? 'Entrando...' : 'Entrar'}
           </Button>
         </form>
+
+        {DEMO_ATIVO && (
+          <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--slate)', textAlign: 'center' }}>
+            <p style={{ color: 'var(--gray-400)', fontSize: 12, marginBottom: 10 }}>
+              Recrutador ou visitante? Explore o sistema sem criar conta.
+            </p>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={preencherDemo}
+              disabled={carregando}
+              style={{ justifyContent: 'center', width: '100%' }}
+            >
+              Preencher com acesso demo
+            </Button>
+            <p style={{ color: 'var(--gray-400)', fontSize: 11, marginTop: 8 }}>
+              Conta somente leitura: dá para navegar por tudo, mas nada é alterado.
+            </p>
+          </div>
+        )}
       </Card>
     </div>
   );

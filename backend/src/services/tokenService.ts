@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { PoolClient } from 'pg';
 import pool from '../db/pool';
 
-export type Perfil = 'admin' | 'operador';
+export type Perfil = 'admin' | 'operador' | 'demo';
 
 export const ACCESS_TOKEN_TTL_SEGUNDOS = 15 * 60; // 15 minutos
 export const REFRESH_TOKEN_TTL_DIAS = 7;

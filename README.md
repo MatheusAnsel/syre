@@ -63,7 +63,7 @@ flowchart LR
     subgraph API [API Node.js + Express]
         direction TB
         A[helmet, CORS e rate limit] --> R[requireAuth<br/>JWT HS256]
-        R --> P[requirePerfil<br/>admin / operador]
+        R --> P[requirePerfil<br/>admin / operador / demo]
         P --> C[Controllers<br/>validação de entrada]
         C --> S[Regras de negócio<br/>transações]
     end
@@ -116,7 +116,7 @@ erDiagram
     usuarios {
         uuid id PK
         string email UK
-        string perfil "admin ou operador"
+        string perfil "admin, operador ou demo"
         bool ativo
     }
     refresh_tokens {
@@ -158,7 +158,7 @@ Ponto que tratei com atenção especial, por ser um sistema com dados de cliente
 - **Autenticação JWT** obrigatória em toda a API (públicas: login, renovação de sessão, logout e a documentação)
 - **Access token de 15 minutos + refresh token de 7 dias com rotação**: cada renovação troca o par inteiro e invalida o anterior. Se um refresh token já usado for reapresentado (sinal de roubo), a sessão inteira é revogada. No banco fica só o hash SHA-256 do token, nunca o valor
 - **Algoritmo do JWT fixado em HS256**, o que impede ataques de troca de algoritmo (`alg: none`)
-- **Perfis de acesso**: `admin` tem acesso total; `operador` não exclui registros nem cancela vendas (403). O perfil vem do token assinado, não do corpo da requisição
+- **Perfis de acesso**: `admin` tem acesso total; `operador` não exclui registros nem cancela vendas (403); `demo` só consulta (toda escrita retorna 403). O perfil vem do token assinado, não do corpo da requisição
 - **bcrypt** para hash de senha, com resposta idêntica para "usuário não existe" e "senha errada" (evita enumeração de e-mails)
 - **Validação de campos com regras reais, não só formato**: CPF e CNPJ passam pelo algoritmo de dígito verificador (módulo 11) — rejeita números como `111.111.111-11`, que têm o formato certo mas não existem; e-mail, CEP, telefone e UF (as 27 siglas) também validados antes de qualquer escrita no banco
 - **Rate limiting**: geral na API, mais restrito no login (contra força bruta) e com limite próprio na renovação de sessão
@@ -274,6 +274,19 @@ ADMIN_NOME="Seu Nome" ADMIN_EMAIL="voce@exemplo.com" ADMIN_SENHA='senha-forte' n
 > sem aspas, o dotenv corta a variável no primeiro `#` ao ler o `.env`.
 
 O usuário criado por esse comando é `admin`. Novos usuários entram como `operador` por padrão.
+
+### Conta de demonstração (para recrutadores)
+
+A tela de login tem o botão **Preencher com acesso demo**: com um clique, e-mail e senha são preenchidos e basta entrar. A conta usa o perfil `demo`, que é **somente leitura**: dá para navegar por todas as telas, mas qualquer gravação (criar, editar, ajustar estoque, mudar status, excluir) é recusada pela API com 403, independentemente do que o frontend mostrar. As credenciais são públicas de propósito, justamente por isso.
+
+Para ativar em um ambiente (depois de aplicar as migrações; a `004_perfil_demo.sql` libera o perfil):
+
+```bash
+cd backend
+DEMO_SENHA='demo-syre-2026' npm run create-demo
+```
+
+O e-mail padrão é `recrutador@syre.dev` (`DEMO_EMAIL` e `DEMO_NOME` são opcionais). No Docker, a conta é criada na subida da API quando `DEMO_SENHA` está definida (o `docker-compose.yml` já traz o padrão). Para a conta ter o que mostrar, popule o ambiente com os dados fictícios (seção "Dados de teste"). O frontend usa `VITE_DEMO_EMAIL` e `VITE_DEMO_SENHA` se você trocar as credenciais, e `VITE_DEMO_DESATIVADO=true` esconde o botão.
 
 ### Atualizando uma instalação que já existe
 

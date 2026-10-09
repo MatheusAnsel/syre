@@ -30,6 +30,9 @@ services:
       ADMIN_NOME: ${ADMIN_NOME:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_SENHA: ${ADMIN_SENHA:-}
+      # Conta de demonstração (somente leitura), igual à que o botão da tela de login preenche.
+      DEMO_EMAIL: ${DEMO_EMAIL:-recrutador@syre.dev}
+      DEMO_SENHA: ${DEMO_SENHA:-demo-syre-2026}
     ports:
       - "3001:3001"
 

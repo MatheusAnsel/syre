@@ -21,7 +21,7 @@
 
 ---
 
-> A demo exige login (é a própria autenticação JWT em ação) e está com dados fictícios de demonstração. Se quiser acessar, me chame pelo LinkedIn.
+> A demo exige login (é a própria autenticação JWT em ação) e usa dados fictícios. Na tela de login, o botão **Preencher com acesso demo** preenche as credenciais de uma conta somente leitura (veja [Conta de demonstração](#conta-de-demonstração-para-recrutadores)).
 
 ## Screenshots
 
@@ -352,7 +352,7 @@ Frontend, backend e banco em provedores separados — de propósito, para deixar
 
 ## Testes e integração contínua
 
-280 testes no total. Os 255 do backend (unitários e de integração, Vitest + Supertest) rodam contra um PostgreSQL real — verificam triggers, transações e restrições do banco, não apenas as rotas. Os 25 do frontend (Vitest + React Testing Library) cobrem login, proteção de rotas, renovação automática de sessão e o tratamento de erro da API — simulando digitação e clique reais, não só chamando funções isoladas.
+Os 255 testes do backend (unitários e de integração, Vitest + Supertest) rodam contra um PostgreSQL real — verificam triggers, transações e restrições do banco, não apenas as rotas. Os 27 do frontend (Vitest + React Testing Library) cobrem login, proteção de rotas, renovação automática de sessão e o tratamento de erro da API — simulando digitação e clique reais, não só chamando funções isoladas.
 
 | Cobertura do backend (out/2026) | Medido | Mínimo exigido no CI |
 |---|---|---|

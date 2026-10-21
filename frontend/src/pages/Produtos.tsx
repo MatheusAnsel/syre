@@ -64,7 +64,7 @@ export default function Produtos() {
     setForm(p => ({ ...p, [k]: e.target.value }));
 
   const estoqueColor = (p: Produto) =>
-    p.estoque_atual <= 0 ? 'red' : p.estoque_atual <= p.estoque_minimo ? 'yellow' : 'green';
+    Number(p.estoque_atual) <= 0 ? 'red' : Number(p.estoque_atual) <= Number(p.estoque_minimo) ? 'yellow' : 'green';
 
   return (
     <div>
@@ -101,9 +101,9 @@ export default function Produtos() {
                     <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--gray-400)' }}>{p.categoria || '—'}</td>
                     <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--accent)' }}>{fmt.currency(p.preco_venda)}</td>
                     <td style={{ padding: '12px 16px' }}>
-                      <Badge label={`${p.estoque_atual} ${p.unidade}`} color={estoqueColor(p)} />
+                      <Badge label={`${fmt.qty(p.estoque_atual)} ${p.unidade}`} color={estoqueColor(p)} />
                     </td>
-                    <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--gray-600)' }}>{p.estoque_minimo} {p.unidade}</td>
+                    <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--gray-600)' }}>{fmt.qty(p.estoque_minimo)} {p.unidade}</td>
                     <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--gray-400)' }}>{p.fornecedor_nome || '—'}</td>
                     <td style={{ padding: '12px 16px' }}>
                       <div style={{ display: 'flex', gap: 8 }}>

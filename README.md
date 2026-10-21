@@ -15,24 +15,30 @@
 [![Docker](https://img.shields.io/badge/Docker-compose-2496ED?style=flat-square&logo=docker&logoColor=white)](#início-rápido-com-docker)
 [![OpenAPI](https://img.shields.io/badge/OpenAPI-3.0-6BA539?style=flat-square&logo=openapiinitiative&logoColor=white)](#documentação-da-api)
 
-[Demo ao vivo](https://syre-six.vercel.app) · [Portfólio](https://matheusansel-dev.vercel.app) · [LinkedIn](https://linkedin.com/in/matheusansel)
+**[Abrir a demo ao vivo](https://syre-six.vercel.app)** · [Portfólio](https://matheusansel-dev.vercel.app) · [LinkedIn](https://linkedin.com/in/matheusansel)
+
+<a href="https://syre-six.vercel.app"><img src="docs/screenshots/demo.gif" alt="Demonstração do Syre: login com o acesso demo, dashboard com vendas dos últimos 6 meses, vendas, contas a receber, produtos e clientes" width="860"/></a>
 
 </div>
 
 ---
 
-> A demo exige login (é a própria autenticação JWT em ação) e usa dados fictícios. Na tela de login, o botão **Preencher com acesso demo** preenche as credenciais de uma conta somente leitura (veja [Conta de demonstração](#conta-de-demonstração-para-recrutadores)).
+> A demo exige login (é a própria autenticação JWT em ação) e usa dados fictícios. Na tela de login, o botão **Preencher com acesso demo** preenche as credenciais de uma conta somente leitura (veja [Conta de demonstração](#conta-de-demonstração-para-recrutadores)). Hospedada em plano gratuito: o primeiro acesso pode levar até um minuto enquanto a API acorda.
 
 ## Screenshots
 
 <table>
 <tr>
-<td><img src="docs/screenshots/dashboard.png" alt="Dashboard com KPIs e gráfico de vendas" width="420"/></td>
-<td><img src="docs/screenshots/clientes.png" alt="Listagem de clientes" width="420"/></td>
+<td><img src="docs/screenshots/dashboard.png" alt="Dashboard com KPIs, vendas dos últimos 6 meses e produtos mais vendidos" width="420"/><br/><sub>Dashboard: KPIs do mês, vendas dos últimos 6 meses e top produtos</sub></td>
+<td><img src="docs/screenshots/contas-receber.png" alt="Contas a receber com filtros por status e recebimento parcial" width="420"/><br/><sub>Contas a receber: status, vencidas em destaque e recebimento parcial</sub></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/produtos.png" alt="Listagem de produtos com estoque" width="420"/></td>
-<td><img src="docs/screenshots/vendas.png" alt="Listagem de vendas por status" width="420"/></td>
+<td><img src="docs/screenshots/vendas.png" alt="Listagem de vendas por status" width="420"/><br/><sub>Vendas por status, com baixa automática no estoque</sub></td>
+<td><img src="docs/screenshots/produtos.png" alt="Listagem de produtos com estoque e alerta de estoque mínimo" width="420"/><br/><sub>Produtos com estoque atual e mínimo</sub></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/estoque.png" alt="Movimentações de estoque de entrada e saída" width="420"/><br/><sub>Movimentações de estoque (entrada e saída)</sub></td>
+<td><img src="docs/screenshots/login.png" alt="Tela de login com o botão de acesso demo" width="420"/><br/><sub>Login com JWT e botão de acesso demo somente leitura</sub></td>
 </tr>
 </table>
 

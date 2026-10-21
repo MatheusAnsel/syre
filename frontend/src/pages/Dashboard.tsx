@@ -5,6 +5,22 @@ import { DashboardData } from '../types';
 import { Card, StatCard, PageHeader } from '../components/ui';
 import { fmt } from '../lib/format';
 
+// A API devolve o mês como 'Mon/YY' (abreviação em inglês do PostgreSQL); exibe em português.
+const MESES_PT: Record<string, string> = {
+  Jan: 'Jan', Feb: 'Fev', Mar: 'Mar', Apr: 'Abr', May: 'Mai', Jun: 'Jun',
+  Jul: 'Jul', Aug: 'Ago', Sep: 'Set', Oct: 'Out', Nov: 'Nov', Dec: 'Dez',
+};
+const mesPt = (mes: string) => {
+  const [abrev, ano] = mes.split('/');
+  return ano ? `${MESES_PT[abrev] ?? abrev}/${ano}` : mes;
+};
+
+// Eixo Y: R$ 500, R$ 1,5k, R$ 12k — sem repetir rótulo por arredondamento.
+const eixoReais = (v: number) =>
+  v >= 1000
+    ? `R$ ${(v / 1000).toLocaleString('pt-BR', { maximumFractionDigits: v % 1000 === 0 ? 0 : 1 })}k`
+    : `R$ ${v}`;
+
 export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
 
@@ -42,12 +58,15 @@ export default function Dashboard() {
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={data.vendas_por_mes} barSize={28}>
               <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-              <XAxis dataKey="mes" tick={{ fill: '#A3A3A3', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#A3A3A3', fontSize: 11 }} axisLine={false} tickLine={false}
-                tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
+              <XAxis dataKey="mes" tick={{ fill: '#A3A3A3', fontSize: 11 }} axisLine={false} tickLine={false}
+                tickFormatter={mesPt} />
+              <YAxis tick={{ fill: '#A3A3A3', fontSize: 11 }} axisLine={false} tickLine={false} width={64}
+                tickFormatter={eixoReais} />
               <Tooltip
                 contentStyle={{ background: '#111', border: '1px solid #262626', borderRadius: 8 }}
-                formatter={(v: number) => [fmt.currency(v), 'Total']}
+                cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                formatter={(v: number | string) => [fmt.currency(Number(v)), 'Total']}
+                labelFormatter={(l: string) => mesPt(l)}
               />
               <Bar dataKey="total" fill="#22D3EE" radius={[4, 4, 0, 0]} />
             </BarChart>
@@ -74,7 +93,7 @@ export default function Dashboard() {
                 </span>
                 <div style={{ flex: 1 }}>
                   <p style={{ fontSize: 13, fontWeight: 500 }}>{p.nome}</p>
-                  <p style={{ fontSize: 11, color: 'var(--gray-600)' }}>{p.quantidade} un.</p>
+                  <p style={{ fontSize: 11, color: 'var(--gray-600)' }}>{fmt.qty(p.quantidade)} un.</p>
                 </div>
               </div>
             ))}

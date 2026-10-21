@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ArrowDownCircle, ArrowUpCircle, AlertTriangle } from 'lucide-react';
 import { api } from '../lib/api';
 import { Produto } from '../types';
+import { fmt } from '../lib/format';
 import {
   Button, PageHeader, Card, EmptyState,
   Modal, FormGroup, Badge,
@@ -46,9 +47,9 @@ export default function Estoque() {
   };
 
   const estoqueColor = (p: Produto) =>
-    p.estoque_atual <= 0 ? 'red' : p.estoque_atual <= p.estoque_minimo ? 'yellow' : 'green';
+    Number(p.estoque_atual) <= 0 ? 'red' : Number(p.estoque_atual) <= Number(p.estoque_minimo) ? 'yellow' : 'green';
 
-  const baixoEstoque = produtos.filter(p => p.estoque_atual <= p.estoque_minimo).length;
+  const baixoEstoque = produtos.filter(p => Number(p.estoque_atual) <= Number(p.estoque_minimo)).length;
 
   return (
     <div>
@@ -97,11 +98,11 @@ export default function Estoque() {
                       {p.codigo && <span style={{ fontSize: 11, color: 'var(--gray-600)', marginLeft: 8, fontFamily: 'monospace' }}>{p.codigo}</span>}
                     </td>
                     <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--gray-400)' }}>{p.unidade}</td>
-                    <td style={{ padding: '12px 16px', fontSize: 15, fontWeight: 600 }}>{Number(p.estoque_atual).toFixed(3)}</td>
-                    <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--gray-600)' }}>{Number(p.estoque_minimo).toFixed(3)}</td>
+                    <td style={{ padding: '12px 16px', fontSize: 15, fontWeight: 600 }}>{fmt.qty(p.estoque_atual)}</td>
+                    <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--gray-600)' }}>{fmt.qty(p.estoque_minimo)}</td>
                     <td style={{ padding: '12px 16px' }}>
                       <Badge
-                        label={p.estoque_atual <= 0 ? 'Sem estoque' : p.estoque_atual <= p.estoque_minimo ? 'Baixo' : 'OK'}
+                        label={Number(p.estoque_atual) <= 0 ? 'Sem estoque' : Number(p.estoque_atual) <= Number(p.estoque_minimo) ? 'Baixo' : 'OK'}
                         color={estoqueColor(p)}
                       />
                     </td>
@@ -143,7 +144,7 @@ export default function Estoque() {
               background: 'var(--graphite)', borderRadius: 8, padding: '12px 16px',
               fontSize: 13, color: 'var(--gray-400)',
             }}>
-              Estoque atual: <strong style={{ color: 'var(--white)' }}>{Number(movModal.estoque_atual).toFixed(3)} {movModal.unidade}</strong>
+              Estoque atual: <strong style={{ color: 'var(--white)' }}>{fmt.qty(movModal.estoque_atual)} {movModal.unidade}</strong>
             </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }}>
@@ -171,7 +172,7 @@ export default function Estoque() {
                   }
                   <div style={{ flex: 1 }}>
                     <p style={{ fontSize: 13, fontWeight: 500 }}>
-                      {m.tipo === 'entrada' ? '+' : '-'}{Number(m.quantidade).toFixed(3)} {histModal.unidade}
+                      {m.tipo === 'entrada' ? '+' : '-'}{fmt.qty(m.quantidade)} {histModal.unidade}
                       {m.motivo && <span style={{ color: 'var(--gray-400)', fontWeight: 400 }}> — {m.motivo}</span>}
                     </p>
                     <p style={{ fontSize: 11, color: 'var(--gray-600)', marginTop: 2 }}>

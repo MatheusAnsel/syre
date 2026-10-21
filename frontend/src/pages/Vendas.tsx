@@ -189,7 +189,7 @@ export default function Vendas() {
                       <div style={{ flex: 1 }}>
                         <p style={{ fontSize: 13, fontWeight: 500 }}>{item.produto_nome}</p>
                         <p style={{ fontSize: 11, color: 'var(--gray-600)' }}>
-                          {item.quantidade} {item.unidade} × {fmt.currency(item.preco_unit)}
+                          {fmt.qty(item.quantidade)} {item.unidade} × {fmt.currency(item.preco_unit)}
                         </p>
                       </div>
                       <span style={{ fontSize: 13, color: 'var(--accent)' }}>{fmt.currency(item.subtotal)}</span>
@@ -245,7 +245,7 @@ export default function Vendas() {
                   <div style={{ flex: 1 }}>
                     <p style={{ fontSize: 13, fontWeight: 500 }}>{item.produto_nome}</p>
                     <p style={{ fontSize: 11, color: 'var(--gray-600)' }}>
-                      {item.quantidade} {item.unidade} × {fmt.currency(item.preco_unit)}
+                      {fmt.qty(item.quantidade)} {item.unidade} × {fmt.currency(item.preco_unit)}
                     </p>
                   </div>
                   <span style={{ color: 'var(--accent)', fontSize: 13 }}>{fmt.currency(item.subtotal)}</span>

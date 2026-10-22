@@ -12,6 +12,7 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 - GIF de demonstração, novas capturas de tela e capa do repositório
 - Correção do aviso da demo e da contagem de testes do frontend
 - CHANGELOG com o histórico de versões
+- Registros de decisão de arquitetura (ADRs) em `docs/adr`
 
 ## [1.4.0] - 2026-10-09
 

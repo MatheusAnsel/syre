@@ -80,6 +80,8 @@ flowchart LR
 
 Camadas separadas de propósito: o frontend nunca fala com o banco, toda regra de negócio (cálculo de totais, baixa de estoque, geração da conta a receber) roda no servidor dentro de transação, e a autorização é checada na API, não na tela.
 
+As decisões que mais moldam o código estão registradas com contexto e consequências em [docs/adr](docs/adr/README.md).
+
 ### Sessão e renovação do token
 
 ```mermaid

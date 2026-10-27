@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { Button, Card } from '../components/ui';
 import { DEMO_ATIVO, DEMO_EMAIL, DEMO_SENHA } from '../lib/demo';
+import { useServidorIniciando, MENSAGEM_SERVIDOR, DETALHE_SERVIDOR } from '../lib/servidor';
 
 export default function Login() {
   const { login } = useAuth();
@@ -12,6 +13,7 @@ export default function Login() {
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
+  const iniciando = useServidorIniciando();
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -52,6 +54,15 @@ export default function Login() {
           </p>
         </div>
 
+        {iniciando && (
+          <div role="status" aria-live="polite" style={{
+            border: '1px solid var(--slate)', borderRadius: 8, padding: '10px 12px', marginBottom: 16,
+            color: 'var(--gray-400)', fontSize: 12, lineHeight: 1.5,
+          }}>
+            <strong style={{ color: 'var(--white)' }}>{MENSAGEM_SERVIDOR}</strong> {DETALHE_SERVIDOR}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <label style={{ color: 'var(--gray-400)', fontSize: 12, fontWeight: 500 }}>E-mail</label>
@@ -80,7 +91,7 @@ export default function Login() {
           )}
 
           <Button type="submit" disabled={carregando} style={{ justifyContent: 'center', marginTop: 8 }}>
-            {carregando ? 'Entrando...' : 'Entrar'}
+            {carregando ? (iniciando ? 'Aguardando o servidor...' : 'Entrando...') : 'Entrar'}
           </Button>
         </form>
 

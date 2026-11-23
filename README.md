@@ -360,7 +360,7 @@ Frontend, backend e banco em provedores separados — de propósito, para deixar
 
 ## Testes e integração contínua
 
-290 testes no total. Os 259 testes do backend (unitários e de integração, Vitest + Supertest) rodam contra um PostgreSQL real — verificam triggers, transações e restrições do banco, não apenas as rotas. Os 31 do frontend (Vitest + React Testing Library) cobrem login, proteção de rotas, renovação automática de sessão e o tratamento de erro da API — simulando digitação e clique reais, não só chamando funções isoladas.
+295 testes no total. Os 259 testes do backend (unitários e de integração, Vitest + Supertest) rodam contra um PostgreSQL real — verificam triggers, transações e restrições do banco, não apenas as rotas. Os 36 do frontend (Vitest + React Testing Library) cobrem login, proteção de rotas, renovação automática de sessão, o tratamento de erro da API e o aviso de servidor iniciando ou fora do ar (com timeout e sem requisição duplicada) — simulando digitação e clique reais, não só chamando funções isoladas.
 
 | Cobertura do backend (out/2026) | Medido | Mínimo exigido no CI |
 |---|---|---|

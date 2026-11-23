@@ -3,7 +3,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { Button, Card } from '../components/ui';
 import { DEMO_ATIVO, DEMO_EMAIL, DEMO_SENHA } from '../lib/demo';
-import { useServidorIniciando, MENSAGEM_SERVIDOR, DETALHE_SERVIDOR } from '../lib/servidor';
+import {
+  useServidor, MENSAGEM_SERVIDOR, DETALHE_SERVIDOR, MENSAGEM_INDISPONIVEL, DETALHE_INDISPONIVEL,
+} from '../lib/servidor';
 
 export default function Login() {
   const { login } = useAuth();
@@ -13,7 +15,8 @@ export default function Login() {
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
-  const iniciando = useServidorIniciando();
+  const { estado: servidor, tentarDeNovo } = useServidor();
+  const iniciando = servidor === 'iniciando';
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -54,12 +57,25 @@ export default function Login() {
           </p>
         </div>
 
-        {iniciando && (
+        {(iniciando || servidor === 'indisponivel') && (
           <div role="status" aria-live="polite" style={{
             border: '1px solid var(--slate)', borderRadius: 8, padding: '10px 12px', marginBottom: 16,
             color: 'var(--gray-400)', fontSize: 12, lineHeight: 1.5,
           }}>
-            <strong style={{ color: 'var(--white)' }}>{MENSAGEM_SERVIDOR}</strong> {DETALHE_SERVIDOR}
+            {iniciando ? (
+              <><strong style={{ color: 'var(--white)' }}>{MENSAGEM_SERVIDOR}</strong> {DETALHE_SERVIDOR}</>
+            ) : (
+              <>
+                <strong style={{ color: 'var(--white)' }}>{MENSAGEM_INDISPONIVEL}</strong> {DETALHE_INDISPONIVEL}{' '}
+                <button
+                  type="button"
+                  onClick={tentarDeNovo}
+                  style={{ background: 'none', border: 0, padding: 0, color: 'var(--accent)', cursor: 'pointer', font: 'inherit', textDecoration: 'underline' }}
+                >
+                  Tentar de novo
+                </button>
+              </>
+            )}
           </div>
         )}
 
